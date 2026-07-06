@@ -64,17 +64,17 @@ const char *utilities_log_level_str(UtilitiesLogLevel level) {
 const char *utilities_log_level_cloudwatch(UtilitiesLogLevel level) {
   switch (level) {
   case UTILITIES_DEBUG:
-    return "DEBUG";
+    return "调试";
   case UTILITIES_INFO:
-    return "INFO";
+    return "信息";
   case UTILITIES_WARN:
-    return "WARN";
+    return "警告";
   case UTILITIES_ERROR:
-    return "ERROR";
+    return "错误";
   case UTILITIES_VERBOSE:
-    return "INFO";
+    return "信息";
   default:
-    return "INFO";
+    return "信息";
   }
 }
 
@@ -82,15 +82,15 @@ void utilities_set_log_level(const char *level) {
   if (!level)
     return;
 
-  if (strcmp(level, "DEBUG") == 0)
+  if (strcmp(level, "调试") == 0 || strcmp(level, "DEBUG") == 0)
     utilities_current_level = UTILITIES_DEBUG;
-  else if (strcmp(level, "INFO") == 0)
+  else if (strcmp(level, "信息") == 0 || strcmp(level, "INFO") == 0)
     utilities_current_level = UTILITIES_INFO;
-  else if (strcmp(level, "WARN") == 0)
+  else if (strcmp(level, "警告") == 0 || strcmp(level, "WARN") == 0)
     utilities_current_level = UTILITIES_WARN;
-  else if (strcmp(level, "ERROR") == 0)
+  else if (strcmp(level, "错误") == 0 || strcmp(level, "ERROR") == 0)
     utilities_current_level = UTILITIES_ERROR;
-  else if (strcmp(level, "VERBOSE") == 0)
+  else if (strcmp(level, "详细") == 0 || strcmp(level, "VERBOSE") == 0)
     utilities_current_level = UTILITIES_VERBOSE;
 }
 
@@ -127,8 +127,8 @@ void utilities_log(UtilitiesLogLevel level, const char *format, ...) {
 
   if (utilities_cloudwatch_mode) {
     fprintf(stdout,
-            "{\"timestamp\":\"%s\",\"level\":\"%s\","
-            "\"app\":\"%s\",\"version\":\"%s\",\"message\":\"%s\"}\n",
+            "{\"时间戳\":\"%s\",\"级别\":\"%s\","
+            "\"应用\":\"%s\",\"版本\":\"%s\",\"消息\":\"%s\"}\n",
             timestamp, utilities_log_level_cloudwatch(level),
             UTILITIES_APP_NAME, UTILITIES_VERSION, message);
     fflush(stdout);
@@ -152,9 +152,10 @@ void utilities_logf(const char *component, const char *operation,
   char buf[UTILITIES_LOG_BUFFER_SIZE];
   int offset = 0;
 
-  offset += snprintf(buf + offset, sizeof(buf) - offset, "[%s::%s] %s (%lldms)",
-                     component ? component : "?", operation ? operation : "?",
-                     status ? status : "", elapsed_ms);
+  offset +=
+      snprintf(buf + offset, sizeof(buf) - offset, "[%s::%s] %s (%lld毫秒)",
+               component ? component : "?", operation ? operation : "?",
+               status ? status : "", elapsed_ms);
 
   if (caller && caller[0] != '\0') {
     offset += snprintf(buf + offset, sizeof(buf) - offset, " @%s", caller);
@@ -209,7 +210,7 @@ void utilities_log_error(const char *component, const char *operation,
                          const char *details[]) {
   char status_buf[1024];
   snprintf(status_buf, sizeof(status_buf), "失败: %s",
-           error_msg ? error_msg : "unknown");
+           error_msg ? error_msg : "未知");
 
   utilities_logf(component, operation, UTILITIES_ERROR, status_buf, elapsed_ms,
                  "", details);
@@ -220,7 +221,7 @@ void utilities_log_warn(const char *component, const char *operation,
                         const char *details[]) {
   char status_buf[1024];
   snprintf(status_buf, sizeof(status_buf), "警告: %s",
-           warn_msg ? warn_msg : "unknown");
+           warn_msg ? warn_msg : "未知");
 
   utilities_logf(component, operation, UTILITIES_WARN, status_buf, elapsed_ms,
                  "", details);
@@ -230,14 +231,14 @@ const char *utilities_mask(const char *sensitive) {
   static __thread char masked[256];
 
   if (!sensitive)
-    return "[REDACTED]";
+    return "[已脱敏]";
 
   size_t len = strlen(sensitive);
   if (len <= UTILITIES_MASK_PREFIX_LEN) {
-    return "[REDACTED]";
+    return "[已脱敏]";
   }
 
-  snprintf(masked, sizeof(masked), "%.*s[REDACTED]", UTILITIES_MASK_PREFIX_LEN,
+  snprintf(masked, sizeof(masked), "%.*s[已脱敏]", UTILITIES_MASK_PREFIX_LEN,
            sensitive);
   return masked;
 }
