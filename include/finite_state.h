@@ -3,7 +3,7 @@
 #ifndef FSM_H
 #define FSM_H
 
-#include "session.h"
+#include "connection.h"
 
 #define HTTP_STATE_BANNER 0
 #define HTTP_STATE_WAIT_CMD 1

@@ -27,10 +27,10 @@ typedef enum {
   QUESTDB_PROTOCOL,
 } protocol_type;
 
-typedef struct connection connection_t;
+struct connection;
 
 typedef struct session_node {
-  connection_t *connection;
+  struct connection *connection;
   struct session_node *next;
 } session_node_t;
 
@@ -43,20 +43,20 @@ session_table_t *session_table_create(void);
 
 void session_table_destroy(session_table_t *table);
 
-void session_table_add(session_table_t *table, connection_t *conn);
+void session_table_add(session_table_t *table, struct connection *conn);
 
-connection_t *session_table_get(session_table_t *table, int sockfd);
+struct connection *session_table_get(session_table_t *table, int sockfd);
 
 void session_table_remove(session_table_t *table, int sockfd);
 
-connection_t *connection_create(int sockfd, const char *ip, uint16_t port,
-                                protocol_type proto, int initial_state);
+struct connection *connection_create(int sockfd, const char *ip, uint16_t port,
+                                     protocol_type proto, int initial_state);
 
-void connection_destroy(connection_t *conn);
+void connection_destroy(struct connection *conn);
 
-void connection_append_data(connection_t *conn, const unsigned char *data,
+void connection_append_data(struct connection *conn, const unsigned char *data,
                             size_t len);
 
-void connection_consume_buffer(connection_t *conn, size_t n);
+void connection_consume_buffer(struct connection *conn, size_t n);
 
 #endif

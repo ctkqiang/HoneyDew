@@ -3,8 +3,8 @@
 #ifndef DISPATCHER_H
 #define DISPATCHER_H
 
+#include "connection.h"
 #include "logger.h"
-#include "session.h"
 
 typedef void (*service_handler_t)(connection_t *conn);
 
