@@ -1,0 +1,270 @@
+#include "../../include/logger.h"
+
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+UtilitiesLogLevel utilities_current_level = UTILITIES_INFO;
+bool utilities_cloudwatch_mode = false;
+
+static utilities_error_cb_t s_error_callback = NULL;
+static pthread_mutex_t s_log_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static const char *s_ansi_reset = "\033[0m";
+static const char *s_ansi_bold = "\033[1m";
+static const char *s_ansi_dim = "\033[90m";
+
+static const char *level_color(UtilitiesLogLevel level) {
+  switch (level) {
+  case UTILITIES_DEBUG:
+    return "\033[36m";
+  case UTILITIES_INFO:
+    return "\033[32m";
+  case UTILITIES_WARN:
+    return "\033[33m";
+  case UTILITIES_ERROR:
+    return "\033[31m";
+  case UTILITIES_VERBOSE:
+    return "\033[35m";
+  default:
+    return "\033[0m";
+  }
+}
+
+static void current_timestamp(char *buf, size_t buf_size) {
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+
+  struct tm tm_info;
+  localtime_r(&ts.tv_sec, &tm_info);
+
+  size_t offset = strftime(buf, buf_size, "%Y-%m-%d %H:%M:%S", &tm_info);
+  snprintf(buf + offset, buf_size - offset, ".%03ld", ts.tv_nsec / 1000000L);
+}
+
+const char *utilities_log_level_str(UtilitiesLogLevel level) {
+  switch (level) {
+  case UTILITIES_DEBUG:
+    return "调试";
+  case UTILITIES_INFO:
+    return "信息";
+  case UTILITIES_WARN:
+    return "警告";
+  case UTILITIES_ERROR:
+    return "错误";
+  case UTILITIES_VERBOSE:
+    return "详细";
+  default:
+    return "未知";
+  }
+}
+
+const char *utilities_log_level_cloudwatch(UtilitiesLogLevel level) {
+  switch (level) {
+  case UTILITIES_DEBUG:
+    return "DEBUG";
+  case UTILITIES_INFO:
+    return "INFO";
+  case UTILITIES_WARN:
+    return "WARN";
+  case UTILITIES_ERROR:
+    return "ERROR";
+  case UTILITIES_VERBOSE:
+    return "INFO";
+  default:
+    return "INFO";
+  }
+}
+
+void utilities_set_log_level(const char *level) {
+  if (!level)
+    return;
+
+  if (strcmp(level, "DEBUG") == 0)
+    utilities_current_level = UTILITIES_DEBUG;
+  else if (strcmp(level, "INFO") == 0)
+    utilities_current_level = UTILITIES_INFO;
+  else if (strcmp(level, "WARN") == 0)
+    utilities_current_level = UTILITIES_WARN;
+  else if (strcmp(level, "ERROR") == 0)
+    utilities_current_level = UTILITIES_ERROR;
+  else if (strcmp(level, "VERBOSE") == 0)
+    utilities_current_level = UTILITIES_VERBOSE;
+}
+
+void utilities_register_error_callback(utilities_error_cb_t cb) {
+  s_error_callback = cb;
+}
+
+const char *utilities_bold(const char *text) {
+  if (!text)
+    return "";
+  if (utilities_cloudwatch_mode)
+    return text;
+
+  static __thread char buf[512];
+  snprintf(buf, sizeof(buf), "%s%s%s", s_ansi_bold, text, s_ansi_reset);
+  return buf;
+}
+
+void utilities_log(UtilitiesLogLevel level, const char *format, ...) {
+  if ((int)level < (int)utilities_current_level && level != UTILITIES_ERROR) {
+    return;
+  }
+
+  va_list args;
+  va_start(args, format);
+  char message[UTILITIES_LOG_BUFFER_SIZE];
+  vsnprintf(message, sizeof(message), format, args);
+  va_end(args);
+
+  char timestamp[40];
+  current_timestamp(timestamp, sizeof(timestamp));
+
+  pthread_mutex_lock(&s_log_mutex);
+
+  if (utilities_cloudwatch_mode) {
+    fprintf(stdout,
+            "{\"timestamp\":\"%s\",\"level\":\"%s\","
+            "\"app\":\"%s\",\"version\":\"%s\",\"message\":\"%s\"}\n",
+            timestamp, utilities_log_level_cloudwatch(level),
+            UTILITIES_APP_NAME, UTILITIES_VERSION, message);
+    fflush(stdout);
+  } else {
+    fprintf(stderr, "%s[%s] [%s%s%s] %s%s\n", s_ansi_dim, timestamp,
+            level_color(level), utilities_log_level_str(level), s_ansi_reset,
+            message, s_ansi_reset);
+  }
+
+  pthread_mutex_unlock(&s_log_mutex);
+
+  if (level == UTILITIES_ERROR && s_error_callback) {
+    s_error_callback(message);
+  }
+}
+
+void utilities_logf(const char *component, const char *operation,
+                    UtilitiesLogLevel level, const char *status,
+                    long long elapsed_ms, const char *caller,
+                    const char *details[]) {
+  char buf[UTILITIES_LOG_BUFFER_SIZE];
+  int offset = 0;
+
+  offset += snprintf(buf + offset, sizeof(buf) - offset, "[%s::%s] %s (%lldms)",
+                     component ? component : "?", operation ? operation : "?",
+                     status ? status : "", elapsed_ms);
+
+  if (caller && caller[0] != '\0') {
+    offset += snprintf(buf + offset, sizeof(buf) - offset, " @%s", caller);
+  }
+
+  if (details) {
+    for (size_t i = 0; details[i] != NULL; ++i) {
+      offset +=
+          snprintf(buf + offset, sizeof(buf) - offset, " | %s", details[i]);
+      if ((size_t)offset >= sizeof(buf) - 1)
+        break;
+    }
+  }
+
+  utilities_log(level, "%s", buf);
+}
+
+void utilities_log_progress(const char *component, const char *operation,
+                            const char *msg, const char *details[]) {
+  char buf[UTILITIES_LOG_BUFFER_SIZE];
+  int offset = 0;
+
+  offset += snprintf(buf + offset, sizeof(buf) - offset, "[%s::%s] %s",
+                     component ? component : "?", operation ? operation : "?",
+                     msg ? msg : "");
+
+  if (details) {
+    for (size_t i = 0; details[i] != NULL; ++i) {
+      offset +=
+          snprintf(buf + offset, sizeof(buf) - offset, " | %s", details[i]);
+      if ((size_t)offset >= sizeof(buf) - 1)
+        break;
+    }
+  }
+
+  utilities_log(UTILITIES_INFO, "%s", buf);
+}
+
+void utilities_log_start(const char *component, const char *operation) {
+  utilities_log(UTILITIES_INFO, "[%s::%s] 开始", component ? component : "?",
+                operation ? operation : "?");
+}
+
+void utilities_log_success(const char *component, const char *operation,
+                           long long elapsed_ms, const char *details[]) {
+  utilities_logf(component, operation, UTILITIES_INFO, "成功", elapsed_ms, "",
+                 details);
+}
+
+void utilities_log_error(const char *component, const char *operation,
+                         const char *error_msg, long long elapsed_ms,
+                         const char *details[]) {
+  char status_buf[1024];
+  snprintf(status_buf, sizeof(status_buf), "失败: %s",
+           error_msg ? error_msg : "unknown");
+
+  utilities_logf(component, operation, UTILITIES_ERROR, status_buf, elapsed_ms,
+                 "", details);
+}
+
+void utilities_log_warn(const char *component, const char *operation,
+                        const char *warn_msg, long long elapsed_ms,
+                        const char *details[]) {
+  char status_buf[1024];
+  snprintf(status_buf, sizeof(status_buf), "警告: %s",
+           warn_msg ? warn_msg : "unknown");
+
+  utilities_logf(component, operation, UTILITIES_WARN, status_buf, elapsed_ms,
+                 "", details);
+}
+
+const char *utilities_mask(const char *sensitive) {
+  static __thread char masked[256];
+
+  if (!sensitive)
+    return "[REDACTED]";
+
+  size_t len = strlen(sensitive);
+  if (len <= UTILITIES_MASK_PREFIX_LEN) {
+    return "[REDACTED]";
+  }
+
+  snprintf(masked, sizeof(masked), "%.*s[REDACTED]", UTILITIES_MASK_PREFIX_LEN,
+           sensitive);
+  return masked;
+}
+
+bool utilities_retry_with_backoff(const char *name, int max_attempts,
+                                  long long backoff_ms,
+                                  bool (*fn)(void *userdata), void *userdata) {
+  if (!fn || max_attempts <= 0)
+    return false;
+
+  for (int i = 0; i < max_attempts; ++i) {
+    if (fn(userdata)) {
+      return true;
+    }
+
+    if (i + 1 < max_attempts) {
+      utilities_log(UTILITIES_WARN, "%s 第 %d/%d 次尝试失败 — %lld毫秒后重试",
+                    name ? name : "?", i + 1, max_attempts, backoff_ms);
+
+      struct timespec ts;
+      ts.tv_sec = backoff_ms / 1000;
+      ts.tv_nsec = (backoff_ms % 1000) * 1000000L;
+      nanosleep(&ts, NULL);
+    }
+  }
+
+  utilities_log(UTILITIES_ERROR, "%s: 已耗尽 %d 次重试", name ? name : "?",
+                max_attempts);
+  return false;
+}
