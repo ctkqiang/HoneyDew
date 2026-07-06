@@ -15,8 +15,9 @@
 #endif
 
 service_binding_t service_map[] = {
-    {8080, run_http_service},
-    {0, NULL},
+    {9090, HTTP_PROTOCOL, run_http_service},
+    {2222, SSH_PROTOCOL, run_ssh_service},
+    {0, UNKNOWN_PROTOCOL, NULL},
 };
 
 static char *extract_line(connection_t *conn) {
@@ -28,7 +29,6 @@ static char *extract_line(connection_t *conn) {
   }
 
   unsigned char *start = conn->tcp_reassembly_buffer;
-
   size_t len = conn->buffer_length;
   size_t i;
 
@@ -43,16 +43,13 @@ static char *extract_line(connection_t *conn) {
       }
 
       memcpy(line, start, line_len);
-
       line[line_len] = '\0';
       size_t consume = i + 1;
 
-      if (consume > conn->buffer_length) {
+      if (consume > conn->buffer_length)
         consume = conn->buffer_length;
-      }
 
       memmove(start, start + consume, conn->buffer_length - consume);
-
       conn->buffer_length -= consume;
 
       pthread_mutex_unlock(&conn->mutex);
@@ -64,8 +61,9 @@ static char *extract_line(connection_t *conn) {
 }
 
 void run_http_service(connection_t *conn) {
-  UTILITIES_LOG_INFO("[调度器] 新会话建立: %s:%d (套接字=%d)", conn->remote_ip,
-                     conn->remote_port, conn->socket_file_descriptor);
+  UTILITIES_LOG_INFO("[HTTP蜜罐] 新会话建立: %s:%d (套接字=%d)",
+                     conn->remote_ip, conn->remote_port,
+                     conn->socket_file_descriptor);
 
   size_t out_len;
   unsigned char *resp = handle_http(conn, NULL, 0, &out_len);
@@ -81,10 +79,10 @@ void run_http_service(connection_t *conn) {
     ssize_t n = recv(conn->socket_file_descriptor, buf, sizeof(buf), 0);
     if (n <= 0) {
       if (n == 0) {
-        UTILITIES_LOG_INFO("[调度器] 客户端断开连接 (套接字=%d)",
+        UTILITIES_LOG_INFO("[HTTP蜜罐] 客户端断开连接 (套接字=%d)",
                            conn->socket_file_descriptor);
       } else {
-        UTILITIES_LOG_WARN("[调度器] 接收数据失败 (套接字=%d)",
+        UTILITIES_LOG_WARN("[HTTP蜜罐] 接收数据失败 (套接字=%d)",
                            conn->socket_file_descriptor);
       }
       break;
@@ -93,7 +91,7 @@ void run_http_service(connection_t *conn) {
 
     char *line;
     while ((line = extract_line(conn)) != NULL) {
-      UTILITIES_LOG_DEBUG("[调度器] 收到指令: \"%s\" (套接字=%d)", line,
+      UTILITIES_LOG_DEBUG("[HTTP蜜罐] 收到指令: \"%s\" (套接字=%d)", line,
                           conn->socket_file_descriptor);
 
       unsigned char *response =
@@ -106,12 +104,65 @@ void run_http_service(connection_t *conn) {
       free(line);
 
       if (conn->state == (state_condition)HTTP_STATE_CLOSE)
-        goto done;
+        goto http_done;
     }
   }
 
-done:
+http_done:
   close(conn->socket_file_descriptor);
-  UTILITIES_LOG_INFO("[调度器] 会话已关闭 (套接字=%d)",
+  UTILITIES_LOG_INFO("[HTTP蜜罐] 会话已关闭 (套接字=%d)",
+                     conn->socket_file_descriptor);
+}
+
+void run_ssh_service(connection_t *conn) {
+  UTILITIES_LOG_INFO("[SSH蜜罐] 新会话建立: %s:%d (套接字=%d)", conn->remote_ip,
+                     conn->remote_port, conn->socket_file_descriptor);
+
+  size_t out_len;
+  unsigned char *resp = handle_ssh(conn, NULL, 0, &out_len);
+
+  if (resp) {
+    send(conn->socket_file_descriptor, resp, out_len, 0);
+    free(resp);
+  }
+
+  unsigned char buf[1024];
+
+  while (1) {
+    ssize_t n = recv(conn->socket_file_descriptor, buf, sizeof(buf), 0);
+    if (n <= 0) {
+      if (n == 0) {
+        UTILITIES_LOG_INFO("[SSH蜜罐] 客户端断开连接 (套接字=%d)",
+                           conn->socket_file_descriptor);
+      } else {
+        UTILITIES_LOG_WARN("[SSH蜜罐] 接收数据失败 (套接字=%d)",
+                           conn->socket_file_descriptor);
+      }
+      break;
+    }
+    connection_append_data(conn, buf, (size_t)n);
+
+    char *line;
+    while ((line = extract_line(conn)) != NULL) {
+      UTILITIES_LOG_WARN("[SSH蜜罐] 收到数据: \"%s\" 来自 %s:%d", line,
+                         conn->remote_ip, conn->remote_port);
+
+      unsigned char *response =
+          handle_ssh(conn, (unsigned char *)line, strlen(line), &out_len);
+
+      if (response) {
+        send(conn->socket_file_descriptor, response, out_len, 0);
+        free(response);
+      }
+      free(line);
+
+      if (conn->state == (state_condition)SSH_STATE_CLOSE)
+        goto ssh_done;
+    }
+  }
+
+ssh_done:
+  close(conn->socket_file_descriptor);
+  UTILITIES_LOG_INFO("[SSH蜜罐] 会话已关闭 (套接字=%d)",
                      conn->socket_file_descriptor);
 }

@@ -10,7 +10,7 @@ typedef struct {
 } config_t;
 
 static inline config_t get_default_config(void) {
-  config_t c = {"蜜罐.log", 100, 8080};
+  config_t c = {"蜜罐.log", 100, 9090};
   return c;
 }
 

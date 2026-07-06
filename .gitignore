@@ -1,2 +1,79 @@
+# Build output
+蜜罐
+*.o
+*.obj
 *.exe
 *.bin
+*.out
+*.app
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+
+# Debug symbols
+*.dSYM/
+*.dSYM
+*.pdb
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# IDE configurations
+.vscode/
+.idea/
+*.xcodeproj/
+*.xcworkspace/
+.project
+.cproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+compile_commands.json
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+
+# Dependency directories
+vendor/
+third_party/
+external/
+
+# CMake build artifacts
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile.cmake
+
+# Coverage and profiling
+*.gcno
+*.gcda
+*.gcov
+lcov.info
+coverage/
+
+# Core dumps
+core
+core.*
+vgcore.*
+
+# Valgrind
+valgrind-out.txt
+callgrind.out.*
+massif.out.*
