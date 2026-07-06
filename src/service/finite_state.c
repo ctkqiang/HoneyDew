@@ -65,6 +65,21 @@ unsigned char *handle_http(connection_t *conn, const unsigned char *input,
   }
 }
 
+static char *extract_ssh_banner(const unsigned char *data, size_t len) {
+  for (size_t i = 0; i < len; i++) {
+    if (data[i] == '\n') {
+      size_t line_len = (i > 0 && data[i - 1] == '\r') ? i - 1 : i;
+      char *banner = malloc(line_len + 1);
+      if (!banner)
+        return NULL;
+      memcpy(banner, data, line_len);
+      banner[line_len] = '\0';
+      return banner;
+    }
+  }
+  return NULL;
+}
+
 unsigned char *handle_ssh(connection_t *conn, const unsigned char *input,
                           size_t input_len, size_t *out_len) {
   pthread_mutex_lock(&conn->mutex);
@@ -87,60 +102,47 @@ unsigned char *handle_ssh(connection_t *conn, const unsigned char *input,
   }
 
   case SSH_STATE_WAIT_AUTH: {
-    (void)input;
-    (void)input_len;
-
     UTILITIES_LOG_WARN("[SSH蜜罐] 认证尝试来自 %s:%d (套接字=%d)",
                        conn->remote_ip, conn->remote_port,
                        conn->socket_file_descriptor);
 
     if (input && input_len > 0) {
-      char safe_input[256];
-      size_t copy_len = input_len < 255 ? input_len : 255;
-      memcpy(safe_input, input, copy_len);
-      safe_input[copy_len] = '\0';
-      UTILITIES_LOG_WARN("[SSH蜜罐] 捕获凭据: \"%s\"", safe_input);
+      char *client_banner = extract_ssh_banner(input, input_len);
+      if (client_banner) {
+        UTILITIES_LOG_WARN("[SSH蜜罐] 客户端标识: \"%s\" 来自 %s:%d",
+                           client_banner, conn->remote_ip, conn->remote_port);
+        free(client_banner);
+      }
+
+      UTILITIES_LOG_INFO("[SSH蜜罐] 捕获原始数据 %zu 字节 来自 %s:%d",
+                         input_len, conn->remote_ip, conn->remote_port);
     }
 
-    const char *auth_fail = "\r\n权限拒绝, 请重试。\r\n"
-                            "Permission denied (publickey,password).\r\n";
-    *out_len = strlen(auth_fail);
+    const char *proto_error = "Protocol mismatch.\r\n";
+    *out_len = strlen(proto_error);
 
     unsigned char *resp = malloc(*out_len + 1);
-    memcpy(resp, auth_fail, *out_len);
+    memcpy(resp, proto_error, *out_len);
 
-    conn->state = (state_condition)SSH_STATE_AUTH_FAIL;
+    conn->state = (state_condition)SSH_STATE_CLOSE;
     pthread_mutex_unlock(&conn->mutex);
 
     return resp;
   }
 
   case SSH_STATE_AUTH_FAIL: {
-    (void)input;
-    (void)input_len;
-
     UTILITIES_LOG_WARN("[SSH蜜罐] 重复认证尝试来自 %s:%d", conn->remote_ip,
                        conn->remote_port);
 
     if (input && input_len > 0) {
-      char safe_input[256];
-      size_t copy_len = input_len < 255 ? input_len : 255;
-      memcpy(safe_input, input, copy_len);
-      safe_input[copy_len] = '\0';
-      UTILITIES_LOG_WARN("[SSH蜜罐] 捕获凭据: \"%s\"", safe_input);
+      UTILITIES_LOG_INFO("[SSH蜜罐] 捕获额外数据 %zu 字节", input_len);
     }
-
-    const char *disconnect = "认证失败次数过多。\r\n"
-                             "Connection closed by remote host.\r\n";
-    *out_len = strlen(disconnect);
-
-    unsigned char *resp = malloc(*out_len + 1);
-    memcpy(resp, disconnect, *out_len);
 
     conn->state = (state_condition)SSH_STATE_CLOSE;
     pthread_mutex_unlock(&conn->mutex);
 
-    return resp;
+    *out_len = 0;
+    return NULL;
   }
 
   default:

@@ -126,7 +126,7 @@ void run_ssh_service(connection_t *conn) {
     free(resp);
   }
 
-  unsigned char buf[1024];
+  unsigned char buf[4096];
 
   while (1) {
     ssize_t n = recv(conn->socket_file_descriptor, buf, sizeof(buf), 0);
@@ -140,28 +140,18 @@ void run_ssh_service(connection_t *conn) {
       }
       break;
     }
-    connection_append_data(conn, buf, (size_t)n);
 
-    char *line;
-    while ((line = extract_line(conn)) != NULL) {
-      UTILITIES_LOG_WARN("[SSH蜜罐] 收到数据: \"%s\" 来自 %s:%d", line,
-                         conn->remote_ip, conn->remote_port);
+    unsigned char *response = handle_ssh(conn, buf, (size_t)n, &out_len);
 
-      unsigned char *response =
-          handle_ssh(conn, (unsigned char *)line, strlen(line), &out_len);
-
-      if (response) {
-        send(conn->socket_file_descriptor, response, out_len, 0);
-        free(response);
-      }
-      free(line);
-
-      if (conn->state == (state_condition)SSH_STATE_CLOSE)
-        goto ssh_done;
+    if (response) {
+      send(conn->socket_file_descriptor, response, out_len, 0);
+      free(response);
     }
+
+    if (conn->state == (state_condition)SSH_STATE_CLOSE)
+      break;
   }
 
-ssh_done:
   close(conn->socket_file_descriptor);
   UTILITIES_LOG_INFO("[SSH蜜罐] 会话已关闭 (套接字=%d)",
                      conn->socket_file_descriptor);
