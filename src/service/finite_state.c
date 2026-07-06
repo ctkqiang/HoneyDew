@@ -18,43 +18,44 @@ unsigned char *handle_http(connection_t *conn, const unsigned char *input,
   switch (current_state) {
 
   case HTTP_STATE_BANNER: {
-    const char *banner = "200 蜜罐HTTP服务器已就绪\r\n";
-    *out_len = strlen(banner);
-
-    unsigned char *resp = malloc(*out_len + 1);
-    memcpy(resp, banner, *out_len);
-
     conn->state = (state_condition)HTTP_STATE_WAIT_CMD;
     pthread_mutex_unlock(&conn->mutex);
-
-    return resp;
+    *out_len = 0;
+    return NULL;
   }
 
   case HTTP_STATE_WAIT_CMD: {
-    const char *resp_str = "HTTP/1.0 200 OK\r\nContent-Type: text/html; "
-                           "charset=utf-8\r\n\r\n"
-                           "<html><body>蜜罐陷阱</body></html>\r\n";
+    const char *resp_str =
+        "HTTP/1.1 200 OK\r\n"
+        "Server: Apache/2.4.29 (Ubuntu)\r\n"
+        "X-Powered-By: PHP/7.2.10\r\n"
+        "Content-Type: text/html; charset=UTF-8\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head><title>Admin Panel</title></head>\n"
+        "<body>\n"
+        "<h1>Welcome to Admin Dashboard</h1>\n"
+        "<p>Server: Apache/2.4.29</p>\n"
+        "<p>PHP Version: 7.2.10</p>\n"
+        "<!-- TODO: remove debug info before production -->\n"
+        "<!-- DB: mysql://root:root@localhost:3306/admin -->\n"
+        "<form action=\"/login\" method=\"POST\">\n"
+        "  <input name=\"username\" placeholder=\"admin\">\n"
+        "  <input name=\"password\" type=\"password\">\n"
+        "  <button>Login</button>\n"
+        "</form>\n"
+        "</body>\n"
+        "</html>\r\n";
     *out_len = strlen(resp_str);
 
     unsigned char *resp = malloc(*out_len + 1);
     memcpy(resp, resp_str, *out_len);
 
-    conn->state = (state_condition)HTTP_STATE_PROCESS;
-
-    pthread_mutex_unlock(&conn->mutex);
-    return resp;
-  }
-
-  case HTTP_STATE_PROCESS: {
-    const char *close_msg = "连接正在关闭。\r\n";
-    *out_len = strlen(close_msg);
-
-    unsigned char *resp = malloc(*out_len + 1);
-    memcpy(resp, close_msg, *out_len);
-
     conn->state = (state_condition)HTTP_STATE_CLOSE;
-    pthread_mutex_unlock(&conn->mutex);
 
+    pthread_mutex_unlock(&conn->mutex);
     return resp;
   }
 

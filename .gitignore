@@ -48,6 +48,11 @@ compile_commands.json
 *.crt
 *.p12
 
+# SSH host keys (each deployment should generate its own)
+ssh_host_*_key
+ssh_host_*_key.pub
+*.pub
+
 # Dependency directories
 vendor/
 third_party/

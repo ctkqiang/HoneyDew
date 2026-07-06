@@ -14,7 +14,31 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
+
+static int ensure_ssh_host_key(const char *key_path) {
+  struct stat st;
+  if (stat(key_path, &st) == 0 && st.st_size > 0) {
+    UTILITIES_LOG_INFO("[蜜罐] SSH 主机密钥已存在: %s", key_path);
+    return 0;
+  }
+
+  UTILITIES_LOG_INFO("[蜜罐] SSH 主机密钥不存在，正在自动生成: %s", key_path);
+
+  char cmd[512];
+  snprintf(cmd, sizeof(cmd), "ssh-keygen -t rsa -b 2048 -f \"%s\" -N \"\" -q",
+           key_path);
+
+  int ret = system(cmd);
+  if (ret != 0) {
+    UTILITIES_LOG_ERROR("[蜜罐] SSH 主机密钥生成失败 (返回码=%d)", ret);
+    return -1;
+  }
+
+  UTILITIES_LOG_INFO("[蜜罐] SSH 主机密钥生成成功: %s", key_path);
+  return 0;
+}
 
 typedef struct {
   int count;
@@ -168,6 +192,11 @@ int main(void) {
   utilities_set_log_level("调试");
   UTILITIES_LOG_INFO("[蜜罐] 正在启动 %s v%s", UTILITIES_APP_NAME,
                      UTILITIES_VERSION);
+
+  if (ensure_ssh_host_key(cfg.ssh_host_key_path) != 0) {
+    UTILITIES_LOG_ERROR("[蜜罐] 无法生成 SSH 主机密钥，SSH 蜜罐将无法正常工作");
+    return 1;
+  }
 
   signal(SIGPIPE, SIG_IGN);
 
