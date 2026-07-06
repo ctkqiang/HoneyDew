@@ -31,6 +31,7 @@ typedef struct connection connection_t;
 
 typedef struct session_node {
   connection_t *connection;
+  struct session_node *next;
 } session_node_t;
 
 typedef struct {

@@ -14,6 +14,7 @@
 typedef struct connection {
   int socket_file_descriptor;
   char remote_ip[INET_ADDRSTRLEN];
+  uint16_t remote_port;
   protocol_type protocol;
   state_condition state;
   time_t last_activity;
