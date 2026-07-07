@@ -255,6 +255,7 @@ HoneyDew/
 ├── makefile                            # 构建脚本：编译、链接、运行、清理
 ├── README.md                           # 项目文档
 ├── docs/                               # 图表文档目录
+│   ├── logo.svg                        # 项目 Logo：SVG 矢量图
 │   ├── system_architecture.mmd         # 系统架构图（Mermaid 源码）
 │   ├── system_architecture.png         # 系统架构图（PNG 渲染）
 │   ├── connection_lifecycle.mmd        # 连接生命周期图（Mermaid 源码）
@@ -920,3 +921,26 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+---
+
+---
+
+<div align="center">
+
+<h2>支持</h2>
+
+<p>如果您觉得本项目对您有帮助，欢迎请我喝杯咖啡</p>
+<p><sub>您的支持是我持续维护和改进的动力</sub></p>
+
+<br/>
+
+<strong>微信扫码捐赠</strong><br/><br/>
+<img src="https://raw.gitcode.com/ctkqiang_sr/ctkqiang_sr/raw/main/mm_reward_qrcode_1778988737577.png"
+     alt="微信扫码捐赠"
+     width="240"
+     style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+
+<br/><br/>
+
+---
