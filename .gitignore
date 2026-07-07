@@ -49,9 +49,9 @@ compile_commands.json
 *.p12
 
 # SSH host keys (each deployment should generate its own)
+keys/
 ssh_host_*_key
 ssh_host_*_key.pub
-*.pub
 
 # Dependency directories
 vendor/

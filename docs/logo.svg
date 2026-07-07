@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="melonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8BC34A"/>
+      <stop offset="50%" style="stop-color:#CDDC39"/>
+      <stop offset="100%" style="stop-color:#9E9E9E"/>
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#42A5F5"/>
+      <stop offset="100%" style="stop-color:#1E88E5"/>
+    </linearGradient>
+    <linearGradient id="netGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#64B5F6"/>
+      <stop offset="100%" style="stop-color:#42A5F5"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <circle cx="100" cy="100" r="90" fill="#1a1a2e" opacity="0.9"/>
+
+  <ellipse cx="100" cy="110" rx="55" ry="50" fill="url(#melonGrad)" opacity="0.95"/>
+
+  <ellipse cx="100" cy="110" rx="55" ry="50" fill="none" stroke="#33691E" stroke-width="2"/>
+
+  <ellipse cx="65" cy="95" rx="8" ry="6" fill="#9E9E9E" opacity="0.6"/>
+  <ellipse cx="100" cy="85" rx="10" ry="7" fill="#9E9E9E" opacity="0.5"/>
+  <ellipse cx="135" cy="95" rx="8" ry="6" fill="#9E9E9E" opacity="0.6"/>
+  <ellipse cx="75" cy="120" rx="7" ry="5" fill="#9E9E9E" opacity="0.4"/>
+  <ellipse cx="125" cy="120" rx="7" ry="5" fill="#9E9E9E" opacity="0.4"/>
+  <ellipse cx="100" cy="135" rx="9" ry="6" fill="#9E9E9E" opacity="0.5"/>
+
+  <path d="M100 50 L95 65 L100 60 L105 65 Z" fill="#33691E"/>
+
+  <path d="M70 75 L70 135 Q50 145 50 165 L70 175 L90 165 Q90 145 70 135 Z" fill="url(#shieldGrad)" opacity="0.9"/>
+
+  <path d="M70 75 L70 135 Q50 145 50 165 L70 175 L90 165 Q90 145 70 135 Z" fill="none" stroke="#1565C0" stroke-width="2"/>
+
+  <circle cx="80" cy="115" r="12" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+
+  <circle cx="80" cy="115" r="6" fill="#FFFFFF" opacity="0.8"/>
+
+  <circle cx="130" cy="70" r="4" fill="url(#netGrad)" filter="url(#glow)"/>
+  <circle cx="150" cy="90" r="4" fill="url(#netGrad)" filter="url(#glow)"/>
+  <circle cx="140" cy="120" r="4" fill="url(#netGrad)" filter="url(#glow)"/>
+  <circle cx="160" cy="110" r="4" fill="url(#netGrad)" filter="url(#glow)"/>
+
+  <line x1="130" y1="70" x2="150" y2="90" stroke="#64B5F6" stroke-width="1.5" opacity="0.7"/>
+  <line x1="150" y1="90" x2="140" y2="120" stroke="#64B5F6" stroke-width="1.5" opacity="0.7"/>
+  <line x1="140" y1="120" x2="160" y2="110" stroke="#64B5F6" stroke-width="1.5" opacity="0.7"/>
+  <line x1="160" y1="110" x2="130" y2="70" stroke="#64B5F6" stroke-width="1.5" opacity="0.7"/>
+  <line x1="130" y1="70" x2="140" y2="120" stroke="#64B5F6" stroke-width="1" opacity="0.5"/>
+  <line x1="150" y1="90" x2="160" y2="110" stroke="#64B5F6" stroke-width="1" opacity="0.5"/>
+
+  <polygon points="155,65 160,75 150,75" fill="#FFC107" filter="url(#glow)"/>
+
+  <circle cx="60" cy="65" r="2" fill="#FF5252" opacity="0.8"/>
+  <circle cx="55" cy="85" r="2" fill="#FF5252" opacity="0.6"/>
+
+  <rect x="35" y="55" width="8" height="3" rx="1" fill="#9E9E9E" opacity="0.5"/>
+  <rect x="35" y="65" width="8" height="3" rx="1" fill="#9E9E9E" opacity="0.5"/>
+  <rect x="35" y="75" width="8" height="3" rx="1" fill="#9E9E9E" opacity="0.5"/>
+</svg>

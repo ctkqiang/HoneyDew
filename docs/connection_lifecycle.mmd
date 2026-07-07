@@ -1,0 +1,28 @@
+sequenceDiagram
+    participant A as 攻击者
+    participant L as 监听线程
+    participant S as 信号量
+    participant H as 处理线程
+    participant ST as 会话表
+    participant P as 协议处理函数
+    participant AU as 审计系统
+
+    A->>L: TCP 连接请求
+    L->>L: accept() 接受连接
+    L->>S: conn_semaphore_acquire()
+    Note over S: 阻塞等待直到<br/>并发数 < max_connections
+    L->>H: pthread_create(connection_handler)
+    H->>H: connection_create(fd, ip, port, proto)
+    H->>ST: session_table_add(conn)
+    H->>P: binding->handler(conn)
+    P->>AU: audit_record_connection()
+    P->>A: 发送服务横幅
+    A->>P: 发送认证/命令数据
+    P->>AU: audit_record_auth() / audit_record_command()
+    P->>A: 返回仿真响应
+    A->>P: 断开连接 / 超时
+    P->>AU: audit_record_disconnect()
+    P->>H: handler 返回
+    H->>ST: session_table_remove(fd)
+    H->>S: conn_semaphore_release()
+    H->>H: free(args), 线程退出

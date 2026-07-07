@@ -1,3 +1,4 @@
+#include "../../include/audit.h"
 #include "../../include/connection.h"
 #include "../../include/logger.h"
 
@@ -9,6 +10,13 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+
+#ifdef __APPLE__
+#include <stdlib.h>
+#define getrandom(buf, len, flags) \
+  (arc4random_buf(buf, len), (len))
+#define GRND_RANDOM 0
+#endif
 
 #define MYSQL_HONEYPOT_SERVER_VERSION "5.7.42-0ubuntu0.18.04.1"
 #define MYSQL_HONEYPOT_AUTH_PLUGIN    "mysql_native_password"
@@ -23,8 +31,16 @@ static void mysql_generate_salt(unsigned char *buf, size_t len) {
       "abcdefghijklmnopqrstuvwxyz"
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
       "0123456789";
-  for (size_t i = 0; i < len; i++) {
-    buf[i] = (unsigned char)charset[rand() % (sizeof(charset) - 1)];
+
+  unsigned char rand_bytes[32];
+  if (getrandom(rand_bytes, sizeof(rand_bytes), GRND_RANDOM) == sizeof(rand_bytes)) {
+    for (size_t i = 0; i < len; i++) {
+      buf[i] = (unsigned char)charset[rand_bytes[i % sizeof(rand_bytes)] % (sizeof(charset) - 1)];
+    }
+  } else {
+    for (size_t i = 0; i < len; i++) {
+      buf[i] = (unsigned char)charset[rand() % (sizeof(charset) - 1)];
+    }
   }
 }
 
@@ -189,7 +205,8 @@ static const char *mysql_extract_username(const unsigned char *pkt,
 static void mysql_extract_and_log_query(const unsigned char *pkt,
                                         size_t pkt_len,
                                         const char *remote_ip,
-                                        uint16_t remote_port) {
+                                        uint16_t remote_port,
+                                        const char *session_id) {
   /*
    * MySQL COM_QUERY packet:
    *   3 bytes payload length
@@ -213,16 +230,25 @@ static void mysql_extract_and_log_query(const unsigned char *pkt,
 
     UTILITIES_LOG_WARN("[MySQL蜜罐] 捕获SQL查询: \"%s\" 来自 %s:%d",
                        query, remote_ip, remote_port);
-  } else {
-    UTILITIES_LOG_WARN("[MySQL蜜罐] 捕获命令类型: 0x%02X 来自 %s:%d",
-                       cmd, remote_ip, remote_port);
-  }
+
+      audit_record_command(&g_audit, MYSQL_PROTOCOL, remote_ip,
+                          remote_port, session_id, query);
+    } else {
+      UTILITIES_LOG_WARN("[MySQL蜜罐] 捕获命令类型: 0x%02X 来自 %s:%d",
+                         cmd, remote_ip, remote_port);
+    }
 }
 
 void run_mysql_service(connection_t *conn) {
+  char session_id[AUDIT_MAX_SESSION_ID_LEN];
+  audit_generate_session_id(session_id, sizeof(session_id));
+
   UTILITIES_LOG_INFO("[MySQL蜜罐] 新连接建立: %s:%d (套接字=%d)",
                      conn->remote_ip, conn->remote_port,
                      conn->socket_file_descriptor);
+
+  audit_record_connection(&g_audit, MYSQL_PROTOCOL, conn->remote_ip,
+                          conn->remote_port, session_id);
 
   srand((unsigned int)(time(NULL) ^ conn->socket_file_descriptor));
 
@@ -280,6 +306,9 @@ void run_mysql_service(connection_t *conn) {
   UTILITIES_LOG_WARN("[MySQL蜜罐] 捕获登录尝试: 用户=\"%s\" 来自 %s:%d",
                      username, conn->remote_ip, conn->remote_port);
 
+  audit_record_auth(&g_audit, MYSQL_PROTOCOL, conn->remote_ip,
+                    conn->remote_port, session_id, username, "", 0);
+
   /* 3. 回复 Access Denied 错误包 */
   unsigned char err_pkt[512];
   size_t err_len = mysql_build_error_packet(err_pkt, sizeof(err_pkt),
@@ -306,7 +335,8 @@ void run_mysql_service(connection_t *conn) {
                        received, conn->remote_ip, conn->remote_port);
 
     mysql_extract_and_log_query(recv_buf, (size_t)received,
-                                conn->remote_ip, conn->remote_port);
+                                conn->remote_ip, conn->remote_port,
+                                session_id);
 
     /* 对后续请求也回复错误 */
     uint8_t seq = recv_buf[3];
@@ -319,6 +349,9 @@ void run_mysql_service(connection_t *conn) {
   }
 
   close(fd);
+
+  audit_record_disconnect(&g_audit, MYSQL_PROTOCOL, conn->remote_ip,
+                          conn->remote_port, session_id);
 
   UTILITIES_LOG_INFO("[MySQL蜜罐] 会话已关闭: %s:%d",
                      conn->remote_ip, conn->remote_port);

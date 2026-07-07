@@ -29,10 +29,8 @@
 /* 辅助函数 */
 /* ========================================================================== */
 
-static void redis_generate_session_id(char *buf, size_t len, int fd) {
-  struct timespec ts;
-  clock_gettime(CLOCK_REALTIME, &ts);
-  snprintf(buf, len, "redis_%d_%ld_%ld", fd, ts.tv_sec, ts.tv_nsec);
+static void redis_generate_session_id(char *buf, size_t len) {
+  audit_generate_session_id(buf, len);
 }
 
 static void redis_str_toupper(char *dst, const char *src, size_t max_len) {
@@ -572,8 +570,7 @@ static int redis_dispatch_command(int fd, const redis_command_t *cmd,
 
 void run_redis_service(connection_t *conn) {
   char session_id[AUDIT_MAX_SESSION_ID_LEN];
-  redis_generate_session_id(session_id, sizeof(session_id),
-                            conn->socket_file_descriptor);
+  redis_generate_session_id(session_id, sizeof(session_id));
 
   UTILITIES_LOG_INFO("[Redis蜜罐] 新连接建立: %s:%d (套接字=%d)",
                      conn->remote_ip, conn->remote_port,

@@ -3,7 +3,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define SSH_HOST_KEY_PATH "ssh_host_rsa_key"
+#define SSH_KEY_DIR "keys"
+#define SSH_HOST_KEY_PATH SSH_KEY_DIR "/ssh_host_rsa_key"
+#define SSH_HOST_KEY_PUB_PATH SSH_HOST_KEY_PATH ".pub"
 
 typedef struct {
   const char *log_file;

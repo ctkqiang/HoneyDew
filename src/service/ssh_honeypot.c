@@ -1,3 +1,4 @@
+#include "../../include/audit.h"
 #include "../../include/config.h"
 #include "../../include/connection.h"
 #include "../../include/dispatcher.h"
@@ -62,8 +63,14 @@ static const char *fake_command_response(const char *cmd) {
 }
 
 void run_ssh_service(connection_t *conn) {
+  char session_id[AUDIT_MAX_SESSION_ID_LEN];
+  audit_generate_session_id(session_id, sizeof(session_id));
+
   UTILITIES_LOG_INFO("[SSH蜜罐] 新会话建立: %s:%d (套接字=%d)", conn->remote_ip,
                      conn->remote_port, conn->socket_file_descriptor);
+
+  audit_record_connection(&g_audit, SSH_PROTOCOL, conn->remote_ip,
+                          conn->remote_port, session_id);
 
   ssh_session session = ssh_new();
   if (!session) {
@@ -129,7 +136,12 @@ void run_ssh_service(connection_t *conn) {
 
         auth_attempts++;
 
-        if (auth_attempts >= SSH_HONEYPOT_MAX_AUTH_ATTEMPTS) {
+        int success = (auth_attempts >= SSH_HONEYPOT_MAX_AUTH_ATTEMPTS) ? 1 : 0;
+        audit_record_auth(&g_audit, SSH_PROTOCOL, conn->remote_ip,
+                          conn->remote_port, session_id,
+                          user ? user : "", pass ? pass : "", success);
+
+        if (success) {
           ssh_message_auth_reply_success(msg, 0);
           authenticated = 1;
         } else {
@@ -225,6 +237,9 @@ void run_ssh_service(connection_t *conn) {
           UTILITIES_LOG_WARN("[SSH蜜罐] 执行命令: \"%s\" 来自 %s:%d", cmd_buf,
                              conn->remote_ip, conn->remote_port);
 
+          audit_record_command(&g_audit, SSH_PROTOCOL, conn->remote_ip,
+                              conn->remote_port, session_id, cmd_buf);
+
           const char *response = fake_command_response(cmd_buf);
           if (!response) {
             UTILITIES_LOG_INFO("[SSH蜜罐] 攻击者退出 shell: %s:%d",
@@ -261,6 +276,9 @@ session_end:
   ssh_disconnect(session);
   ssh_bind_free(sshbind);
   ssh_free(session);
+
+  audit_record_disconnect(&g_audit, SSH_PROTOCOL, conn->remote_ip,
+                          conn->remote_port, session_id);
 
   UTILITIES_LOG_INFO("[SSH蜜罐] 会话已关闭: %s:%d", conn->remote_ip,
                      conn->remote_port);

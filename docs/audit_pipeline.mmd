@@ -1,0 +1,38 @@
+flowchart LR
+    subgraph 协议处理线程
+        T1["FTP 处理线程"]
+        T2["SSH 处理线程"]
+        T3["Redis 处理线程"]
+        TN["... 其他线程"]
+    end
+
+    subgraph 环形缓冲区["环形缓冲区 (4096 条)"]
+        RB["audit_record_t ring_buffer"]
+        HEAD["head 指针"]
+        COUNT["count 计数器"]
+        SEQ["sequence_number 递增"]
+    end
+
+    subgraph 刷写线程["异步刷写线程"]
+        FLUSH["flush_thread_func()"]
+        WAIT["pthread_cond_timedwait<br/>每秒唤醒一次"]
+        WRITE["write_record()"]
+    end
+
+    subgraph 磁盘存储
+        DIR["audit_logs/"]
+        FILE["audit_YYYYMMDD_HHMMSS.log"]
+        ROTATE["日志文件轮转"]
+    end
+
+    T1 -->|"audit_record_event()<br/>加锁写入"| RB
+    T2 -->|"audit_record_event()<br/>加锁写入"| RB
+    T3 -->|"audit_record_event()<br/>加锁写入"| RB
+    TN -->|"audit_record_event()<br/>加锁写入"| RB
+
+    RB -->|"pthread_cond_signal"| FLUSH
+    FLUSH --> WAIT
+    WAIT --> WRITE
+    WRITE --> FILE
+    FILE --> ROTATE
+    ROTATE --> DIR

@@ -2,12 +2,22 @@
 #include "../../include/logger.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#ifdef __APPLE__
+#include <stdlib.h>
+#define getrandom(buf, len, flags) \
+  (arc4random_buf(buf, len), (len))
+#define GRND_RANDOM 0
+#else
+#include <sys/random.h>
+#endif
 
 audit_trail_t g_audit;
 
@@ -121,17 +131,26 @@ static int rotate_log_file(audit_trail_t *trail) {
 
   if (trail->current_log_file) {
     fclose(trail->current_log_file);
+    trail->current_log_file = NULL;
   }
 
-  trail->current_log_file = fopen(new_path, "a");
+  int fd = open(new_path, O_CREAT | O_WRONLY | O_APPEND, 0600);
+  if (fd < 0) {
+    UTILITIES_LOG_ERROR("[审计] 无法创建审计日志文件: %s (%s)", new_path,
+                        strerror(errno));
+    return -1;
+  }
+
+  trail->current_log_file = fdopen(fd, "a");
   if (!trail->current_log_file) {
-    UTILITIES_LOG_ERROR("[审计] 无法打开审计日志文件: %s (%s)", new_path,
+    close(fd);
+    UTILITIES_LOG_ERROR("[审计] 无法打开审计日志文件流: %s (%s)", new_path,
                         strerror(errno));
     return -1;
   }
 
   strncpy(trail->current_log_path, new_path, sizeof(trail->current_log_path) - 1);
-  UTILITIES_LOG_INFO("[审计] 审计日志文件已打开: %s", new_path);
+  UTILITIES_LOG_INFO("[审计] 审计日志文件已打开: %s (权限=0600)", new_path);
   return 0;
 }
 
@@ -329,4 +348,56 @@ void audit_record_disconnect(audit_trail_t *trail, int protocol,
                              const char *session_id) {
   audit_record_event(trail, AUDIT_EVENT_DISCONNECTION, AUDIT_SEVERITY_LOW,
                      protocol, ip, port, session_id, NULL, "连接断开");
+}
+
+void audit_generate_session_id(char *buf, size_t buf_len) {
+  if (!buf || buf_len < 37) {
+    return;
+  }
+
+  unsigned char uuid[16];
+  if (getrandom(uuid, sizeof(uuid), GRND_RANDOM) != sizeof(uuid)) {
+    unsigned int seed = (unsigned int)(time(NULL) ^ getpid());
+    for (size_t i = 0; i < sizeof(uuid); i++) {
+      uuid[i] = (unsigned char)((seed * 1103515245 + 12345) >> 16);
+      seed = (unsigned int)(uuid[i] ^ (time(NULL) + i));
+    }
+  }
+
+  uuid[6] = (uuid[6] & 0x0F) | 0x40;
+  uuid[8] = (uuid[8] & 0x3F) | 0x80;
+
+  const char *hex = "0123456789abcdef";
+  size_t pos = 0;
+
+  for (size_t i = 0; i < 4 && pos < buf_len - 1; i++) {
+    buf[pos++] = hex[(uuid[i] >> 4) & 0x0F];
+    buf[pos++] = hex[uuid[i] & 0x0F];
+  }
+  if (pos < buf_len - 1) buf[pos++] = '-';
+
+  for (size_t i = 4; i < 6 && pos < buf_len - 1; i++) {
+    buf[pos++] = hex[(uuid[i] >> 4) & 0x0F];
+    buf[pos++] = hex[uuid[i] & 0x0F];
+  }
+  if (pos < buf_len - 1) buf[pos++] = '-';
+
+  for (size_t i = 6; i < 8 && pos < buf_len - 1; i++) {
+    buf[pos++] = hex[(uuid[i] >> 4) & 0x0F];
+    buf[pos++] = hex[uuid[i] & 0x0F];
+  }
+  if (pos < buf_len - 1) buf[pos++] = '-';
+
+  for (size_t i = 8; i < 10 && pos < buf_len - 1; i++) {
+    buf[pos++] = hex[(uuid[i] >> 4) & 0x0F];
+    buf[pos++] = hex[uuid[i] & 0x0F];
+  }
+  if (pos < buf_len - 1) buf[pos++] = '-';
+
+  for (size_t i = 10; i < 16 && pos < buf_len - 1; i++) {
+    buf[pos++] = hex[(uuid[i] >> 4) & 0x0F];
+    buf[pos++] = hex[uuid[i] & 0x0F];
+  }
+
+  buf[pos] = '\0';
 }

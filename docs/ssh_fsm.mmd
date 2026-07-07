@@ -1,0 +1,8 @@
+stateDiagram-v2
+    [*] --> KEX: 连接建立
+    KEX --> AUTH: 密钥交换成功<br/>ssh_handle_key_exchange()
+    AUTH --> AUTH: 密码认证失败<br/>记录凭据<br/>尝试次数 < 3
+    AUTH --> SHELL: 第 3 次认证<br/>允许登录
+    AUTH --> [*]: 超时或断开
+    SHELL --> SHELL: 执行命令<br/>返回伪造响应
+    SHELL --> [*]: exit/logout<br/>或连接断开

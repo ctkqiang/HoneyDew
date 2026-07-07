@@ -13,7 +13,7 @@
 
 typedef struct connection {
   int socket_file_descriptor;
-  char remote_ip[INET_ADDRSTRLEN];
+  char remote_ip[INET6_ADDRSTRLEN];
   uint16_t remote_port;
   protocol_type protocol;
   state_condition state;

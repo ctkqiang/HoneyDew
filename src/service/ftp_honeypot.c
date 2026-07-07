@@ -88,10 +88,8 @@ typedef struct {
   char cwd[512];
 } ftp_session_t;
 
-static void ftp_generate_session_id(char *buf, size_t len, int fd) {
-  struct timespec ts;
-  clock_gettime(CLOCK_REALTIME, &ts);
-  snprintf(buf, len, "ftp_%d_%ld_%ld", fd, ts.tv_sec, ts.tv_nsec);
+static void ftp_generate_session_id(char *buf, size_t len) {
+  audit_generate_session_id(buf, len);
 }
 
 static void ftp_strip_crlf(char *str) {
@@ -256,8 +254,7 @@ static void ftp_handle_dele(int sockfd, const char *line,
 
 void run_ftp_service(connection_t *conn) {
   char session_id[AUDIT_MAX_SESSION_ID_LEN];
-  ftp_generate_session_id(session_id, sizeof(session_id),
-                          conn->socket_file_descriptor);
+  ftp_generate_session_id(session_id, sizeof(session_id));
 
   UTILITIES_LOG_INFO("[FTP蜜罐] 新连接建立: %s:%d (套接字=%d)",
                      conn->remote_ip, conn->remote_port,

@@ -1,0 +1,71 @@
+flowchart TB
+    subgraph 主进程
+        MAIN["main()"] --> SSH_KEY["确保 SSH 主机密钥"]
+        MAIN --> SESSION["创建会话表 session_table_t"]
+        MAIN --> SEM["初始化连接信号量 max=100"]
+        MAIN --> SPAWN["为每个协议创建监听线程"]
+    end
+
+    subgraph 监听线程["监听线程 (每协议一个)"]
+        LISTEN["socket() / bind() / listen()"] --> ACCEPT["accept() 等待连接"]
+        ACCEPT --> ACQUIRE["信号量获取 conn_semaphore_acquire"]
+        ACQUIRE --> THREAD["创建处理线程 pthread_create"]
+        THREAD --> ACCEPT
+    end
+
+    subgraph 处理线程["连接处理线程"]
+        HANDLER["connection_handler()"] --> CREATE["connection_create()"]
+        CREATE --> ADD["session_table_add()"]
+        ADD --> DISPATCH["调用协议处理函数 handler(conn)"]
+        DISPATCH --> REMOVE["session_table_remove()"]
+        REMOVE --> RELEASE["信号量释放 conn_semaphore_release"]
+    end
+
+    subgraph 协议处理["协议处理函数"]
+        HTTP["run_http_service"]
+        SSH["run_ssh_service"]
+        FTP["run_ftp_service"]
+        TELNET["run_telnet_service"]
+        SMTP["run_smtp_service"]
+        MYSQL["run_mysql_service"]
+        REDIS["run_redis_service"]
+        PG["run_postgresql_service"]
+        POP3["run_pop3_service"]
+        IMAP["run_imap_service"]
+        DNS["run_dns_service"]
+        QDB["run_questdb_service"]
+    end
+
+    subgraph 基础设施
+        LOG["日志系统 logger"]
+        AUDIT["审计追踪 audit_trail"]
+        FSM["有限状态机 FSM"]
+    end
+
+    SPAWN --> LISTEN
+    THREAD --> HANDLER
+    DISPATCH --> HTTP
+    DISPATCH --> SSH
+    DISPATCH --> FTP
+    DISPATCH --> TELNET
+    DISPATCH --> SMTP
+    DISPATCH --> MYSQL
+    DISPATCH --> REDIS
+    DISPATCH --> PG
+    DISPATCH --> POP3
+    DISPATCH --> IMAP
+    DISPATCH --> DNS
+    DISPATCH --> QDB
+
+    HTTP --> LOG
+    SSH --> LOG
+    FTP --> LOG
+    FTP --> AUDIT
+    TELNET --> AUDIT
+    REDIS --> AUDIT
+    PG --> AUDIT
+    POP3 --> AUDIT
+    IMAP --> AUDIT
+    DNS --> AUDIT
+    QDB --> AUDIT
+    HTTP --> FSM

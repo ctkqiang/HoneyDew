@@ -1,0 +1,5 @@
+stateDiagram-v2
+    [*] --> BANNER: 连接建立
+    BANNER --> WAIT_CMD: 初始化完成
+    WAIT_CMD --> CLOSE: 返回 HTTP 200 响应<br/>包含 Admin Panel 页面<br/>和泄露的 MySQL 连接串
+    CLOSE --> [*]: 关闭连接

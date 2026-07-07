@@ -97,6 +97,8 @@ void audit_record_disconnect(audit_trail_t *trail, int protocol, const char *ip,
 
 extern audit_trail_t g_audit;
 
+void audit_generate_session_id(char *buf, size_t buf_len);
+
 #ifdef __cplusplus
 }
 #endif
