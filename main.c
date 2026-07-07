@@ -91,8 +91,7 @@ static void *connection_handler(void *arg) {
   inet_ntop(AF_INET, &a->client_addr.sin_addr, ip, sizeof(ip));
   uint16_t port = ntohs(a->client_addr.sin_port);
 
-  connection_t *conn =
-      connection_create(fd, ip, port, a->binding->proto, SSH_STATE_BANNER);
+  connection_t *conn = connection_create(fd, ip, port, a->binding->proto, 0);
   session_table_add(a->sessions, conn);
 
   a->binding->handler(conn);

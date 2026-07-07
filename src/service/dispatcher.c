@@ -17,6 +17,16 @@
 service_binding_t service_map[] = {
     {9090, HTTP_PROTOCOL, run_http_service},
     {2222, SSH_PROTOCOL, run_ssh_service},
+    {2121, FTP_PROTOCOL, run_ftp_service},
+    {2323, TELNET_PROTOCOL, run_telnet_service},
+    {2525, SMTP_PROTOCOL, run_smtp_service},
+    {3306, MYSQL_PROTOCOL, run_mysql_service},
+    {6379, REDIS_PROTOCOL, run_redis_service},
+    {5432, POSTGRESQL_PROTOCOL, run_postgresql_service},
+    {1100, POP3_PROTOCOL, run_pop3_service},
+    {1430, IMAP_PROTOCOL, run_imap_service},
+    {5353, DNS_PROTOCOL, run_dns_service},
+    {8812, QUESTDB_PROTOCOL, run_questdb_service},
     {0, UNKNOWN_PROTOCOL, NULL},
 };
 

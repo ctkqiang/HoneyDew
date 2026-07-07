@@ -2,8 +2,9 @@ CC      := gcc
 CFLAGS  := -std=c99 -Wall -Wextra -Wpedantic -pthread
 LDFLAGS := -pthread
 
-LIBSSH_CFLAGS := $(shell pkg-config --cflags libssh 2>/dev/null)
-LIBSSH_LIBS   := $(shell pkg-config --libs libssh 2>/dev/null)
+HOMEBREW_PREFIX := $(shell brew --prefix 2>/dev/null || echo /opt/homebrew)
+LIBSSH_CFLAGS  := -I$(HOMEBREW_PREFIX)/include
+LIBSSH_LIBS    := -L$(HOMEBREW_PREFIX)/lib -lssh
 
 CFLAGS  += $(LIBSSH_CFLAGS)
 LDFLAGS += $(LIBSSH_LIBS)
@@ -15,7 +16,18 @@ SRCS := main.c \
         src/service/finite_state.c \
         src/service/dispatcher.c \
         src/service/ssh_honeypot.c \
-        src/utilities/logger.c
+        src/service/ftp_honeypot.c \
+        src/service/telnet_honeypot.c \
+        src/service/smtp_honeypot.c \
+        src/service/mysql_honeypot.c \
+        src/service/redis_honeypot.c \
+        src/service/postgresql_honeypot.c \
+        src/service/pop3_honeypot.c \
+        src/service/imap_honeypot.c \
+        src/service/dns_honeypot.c \
+        src/service/questdb_honeypot.c \
+        src/utilities/logger.c \
+        src/utilities/audit.c
 
 OBJS := $(SRCS:.c=.o)
 

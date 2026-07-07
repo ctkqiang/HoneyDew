@@ -20,19 +20,23 @@ extern "C" {
 #define UTILITIES_MASK_PREFIX_LEN 4
 
 typedef enum {
+  UTILITIES_VERBOSE,
   UTILITIES_DEBUG,
   UTILITIES_INFO,
   UTILITIES_WARN,
   UTILITIES_ERROR,
-  UTILITIES_VERBOSE
 } UtilitiesLogLevel;
 
 typedef void (*utilities_error_cb_t)(const char *msg);
 
 extern UtilitiesLogLevel utilities_current_level;
 extern bool utilities_cloudwatch_mode;
+extern bool utilities_file_logging;
+extern const char *utilities_log_file_path;
 
 void utilities_set_log_level(const char *level);
+void utilities_enable_cloudwatch_mode(bool enable);
+void utilities_enable_file_logging(const char *file_path);
 void utilities_register_error_callback(utilities_error_cb_t cb);
 
 const char *utilities_bold(const char *text);
@@ -49,10 +53,11 @@ void utilities_logf(const char *component, const char *operation,
   utilities_logf((comp), (op), (lvl), (status), (elapsed), __func__,           \
                  ((const char *[]){__VA_ARGS__, NULL}))
 
-#define UTILITIES_LOG_ERROR(...) utilities_log(UTILITIES_ERROR, __VA_ARGS__)
-#define UTILITIES_LOG_INFO(...) utilities_log(UTILITIES_INFO, __VA_ARGS__)
+#define UTILITIES_LOG_VERBOSE(...) utilities_log(UTILITIES_VERBOSE, __VA_ARGS__)
 #define UTILITIES_LOG_DEBUG(...) utilities_log(UTILITIES_DEBUG, __VA_ARGS__)
+#define UTILITIES_LOG_INFO(...) utilities_log(UTILITIES_INFO, __VA_ARGS__)
 #define UTILITIES_LOG_WARN(...) utilities_log(UTILITIES_WARN, __VA_ARGS__)
+#define UTILITIES_LOG_ERROR(...) utilities_log(UTILITIES_ERROR, __VA_ARGS__)
 
 void utilities_log_progress(const char *component, const char *operation,
                             const char *msg, const char *details[]);
