@@ -28,6 +28,9 @@
 - [审计追踪系统](#审计追踪系统)
 - [项目结构](#项目结构)
 - [编译与运行](#编译与运行)
+  - [方式一: Make 构建](#方式一-make-构建推荐开发使用)
+  - [方式二: CMake 构建](#方式二-cmake-构建推荐跨平台--生产部署)
+  - [Make 与 CMake 对比](#make-与-cmake-对比)
 - [攻击模拟指南](#攻击模拟指南)
 - [安全最佳实践](#安全最佳实践)
 - [技术实现细节](#技术实现细节)
@@ -252,7 +255,8 @@ HoneyDew 的日志系统支持五个日志级别和两种输出模式，通过 `
 ```
 HoneyDew/
 ├── main.c                              # 主入口：初始化、监听线程创建、信号处理
-├── makefile                            # 构建脚本：编译、链接、运行、清理
+├── makefile                            # Make 构建脚本：编译、链接、运行、清理
+├── CMakeLists.txt                      # CMake 构建配置：跨平台编译、安装规则
 ├── README.md                           # 项目文档
 ├── docs/                               # 图表文档目录
 │   ├── logo.svg                        # 项目 Logo：SVG 矢量图
@@ -305,50 +309,159 @@ HoneyDew/
 
 ### 前置条件
 
-- GCC 编译器（支持 C99 标准）
+- GCC 编译器（支持 C99 标准）或 Clang
+- CMake >= 3.14（可选，用于跨平台构建）
 - libssh 开发库
 - POSIX 兼容操作系统（Linux / macOS）
 
-### 安装 libssh
+### 安装依赖
 
 **macOS (Homebrew):**
 
 ```bash
-brew install libssh
+brew install libssh cmake
 ```
 
 **Ubuntu / Debian:**
 
 ```bash
-sudo apt-get install libssh-dev
+sudo apt-get install libssh-dev cmake build-essential
 ```
 
-### 编译
+**Fedora / RHEL:**
 
 ```bash
-# 编译项目
+sudo dnf install libssh-devel cmake gcc
+```
+
+### 方式一: Make 构建（推荐开发使用）
+
+```bash
+# 编译项目（自动生成 SSH 密钥）
 make build
 
 # 编译并运行
 make run
 
-# 清理编译产物
+# 仅生成 SSH 密钥
+make keys
+
+# 清理编译产物和密钥
 make clean
 ```
 
+### 方式二: CMake 构建（推荐跨平台 / 生产部署）
+
+CMake 支持多种生成器（Make、Ninja、Xcode、Visual Studio），适合跨平台编译和 IDE 集成。
+
+**基本构建流程:**
+
+```bash
+# 创建构建目录
+mkdir -p build && cd build
+
+# 配置（Release 模式）
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# 编译（自动并行）
+cmake --build . -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+# 运行
+./蜜罐
+```
+
+**Debug 构建（含调试符号）:**
+
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+cmake --build . -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+```
+
+**使用 Ninja 生成器（更快的增量构建）:**
+
+```bash
+cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
+ninja
+```
+
+**使用 Xcode 生成器（macOS IDE 开发）:**
+
+```bash
+cmake .. -G Xcode
+open HoneyDew.xcodeproj
+```
+
+**安装到系统:**
+
+```bash
+cd build
+sudo cmake --install .
+# 二进制 -> /usr/local/bin/蜜罐
+# 密钥   -> /usr/local/etc/honeydew/keys/
+# 头文件 -> /usr/local/include/honeydew/
+```
+
+**自定义安装路径:**
+
+```bash
+cmake .. -DCMAKE_INSTALL_PREFIX=/opt/honeydew
+cmake --build .
+cmake --install .
+```
+
+**清理 CMake 构建:**
+
+```bash
+cd .. && rm -rf build
+```
+
+### Make 与 CMake 对比
+
+| 特性       | Make                | CMake                        |
+| ---------- | ------------------- | ---------------------------- |
+| 配置复杂度 | 零配置，直接 `make` | 需要 `cmake ..` 配置步骤     |
+| 跨平台     | 仅 POSIX            | macOS / Linux / Windows      |
+| IDE 集成   | 无                  | Xcode / CLion / VS Code      |
+| 生成器     | 仅 Make             | Make / Ninja / Xcode / VS    |
+| 依赖查找   | 手动指定路径        | 自动 `pkg-config` + 回退搜索 |
+| 增量构建   | 基于文件时间戳      | 基于依赖图（更精确）         |
+| 安装规则   | 无                  | `cmake --install`            |
+| 推荐场景   | 本地快速开发        | CI/CD、生产部署、跨平台      |
+
 ### SSH 主机密钥
 
-首次运行时，系统会自动检测 SSH 主机密钥是否存在。若不存在，将自动调用 `ssh-keygen` 生成 2048 位 RSA 密钥：
+两种构建方式都会**自动生成** SSH 密钥。密钥存放在 `keys/` 目录下：
 
 ```
-[信息] [蜜罐] SSH 主机密钥不存在，正在自动生成: ssh_host_rsa_key
-[信息] [蜜罐] SSH 主机密钥生成成功: ssh_host_rsa_key
+keys/
+  ssh_host_rsa_key       # 私钥 (权限 0600)
+  ssh_host_rsa_key.pub   # 公钥 (权限 0644)
 ```
+
+构建时的密钥生成流程：
+
+1. 检查 `keys/ssh_host_rsa_key` 是否存在且非空
+2. 若不存在，自动创建 `keys/` 目录（权限 `0700`）
+3. 调用 `ssh-keygen -t rsa -b 2048` 生成密钥对
+4. 设置私钥权限 `0600`，公钥权限 `0644`
+5. 验证私钥 PEM 格式头（`-----BEGIN`）和公钥文件完整性
+
+```
+[密钥生成] 正在生成 RSA-2048 SSH 主机密钥...
+[密钥生成] 私钥: keys/ssh_host_rsa_key (权限=0600)
+[密钥生成] 公钥: keys/ssh_host_rsa_key.pub (权限=0644)
+[密钥验证] 私钥格式正确 (PEM)
+[密钥验证] 公钥文件有效
+[密钥生成] SSH 密钥对生成并验证完毕
+```
+
+> 注意: `keys/` 目录已在 `.gitignore` 中排除。每个部署环境应独立生成自己的密钥。
 
 ### 运行输出
 
 ```
 [信息] [蜜罐] 正在启动 HoneyDew v1.0.0
+[信息] [蜜罐] SSH 密钥对验证通过
 [信息] [蜜罐] 共 12 个服务待启动，最大连接数 100
 [信息] [审计] 审计追踪系统已启动 (缓冲区=4096 条记录)
 [信息] [蜜罐] 端口 9090 已启动监听
@@ -941,6 +1054,7 @@ SOFTWARE.
      width="240"
      style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
 
-<br/><br/>
+<br/>
+<br/>
 
 ---
