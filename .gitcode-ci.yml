@@ -1,0 +1,107 @@
+# =============================================================================
+# HoneyDew GitCode CI 流水线
+# 支持 Linux 平台自动编译、语法检查与产物归档
+# GitCode CI 基于 GitLab CI 语法
+# =============================================================================
+
+stages:
+  - 检查
+  - 编译
+  - 验证
+
+variables:
+  BUILD_TYPE: Release
+
+# =============================================================================
+# 代码质量检查
+# =============================================================================
+代码语法检查:
+  stage: 检查
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq gcc libssh-dev pkg-config > /dev/null 2>&1
+  script:
+    - echo "========================================="
+    - echo "  HoneyDew 代码语法检查"
+    - echo "========================================="
+    - |
+      FAILED=0
+      for f in main.c src/service/*.c src/utilities/*.c; do
+        if gcc -std=c99 -fsyntax-only \
+          -I./include \
+          $(pkg-config --cflags libssh 2>/dev/null) \
+          "$f" 2>&1; then
+          echo "[通过] $f"
+        else
+          echo "[失败] $f"
+          FAILED=1
+        fi
+      done
+      if [ "$FAILED" -eq 1 ]; then
+        echo "语法检查失败"
+        exit 1
+      fi
+    - echo "所有源文件语法检查通过"
+
+# =============================================================================
+# Ubuntu/Linux 编译
+# =============================================================================
+编译-Ubuntu:
+  stage: 编译
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq
+        build-essential
+        cmake
+        pkg-config
+        libssh-dev
+        openssh-client
+        > /dev/null 2>&1
+  script:
+    - echo "========================================="
+    - echo "  HoneyDew 编译 (Ubuntu/Linux)"
+    - echo "========================================="
+    - cmake -B build -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+    - cmake --build build --config ${BUILD_TYPE} -j$(nproc)
+    - echo "编译成功"
+  artifacts:
+    name: "honeydew-linux-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - build/蜜罐
+      - build/keys/
+    expire_in: 30 days
+
+# =============================================================================
+# 构建产物验证
+# =============================================================================
+验证构建产物:
+  stage: 验证
+  image: ubuntu:22.04
+  needs:
+    - 编译-Ubuntu
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq file libssh-4 > /dev/null 2>&1
+  script:
+    - echo "========================================="
+    - echo "  HoneyDew 构建产物验证"
+    - echo "========================================="
+    - |
+      if [ ! -f "build/蜜罐" ]; then
+        echo "[失败] 未找到编译产物: build/蜜罐"
+        exit 1
+      fi
+    - ls -la build/蜜罐
+    - file build/蜜罐
+    - ldd build/蜜罐 || true
+    - echo "---"
+    - |
+      if [ -d "build/keys" ]; then
+        ls -la build/keys/
+        echo "[通过] SSH 密钥已生成"
+      else
+        echo "[警告] SSH 密钥目录不存在（将在运行时自动生成）"
+      fi
+    - echo "构建产物验证完毕"

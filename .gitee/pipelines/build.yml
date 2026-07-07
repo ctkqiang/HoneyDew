@@ -1,0 +1,130 @@
+# =============================================================================
+# HoneyDew Gitee Go 流水线
+# 支持 Linux 平台自动编译、语法检查与产物归档
+# 文档: https://gitee.com/help/articles/4356
+# =============================================================================
+
+name: HoneyDew 编译流水线
+
+displayName: "HoneyDew 跨平台编译"
+
+triggers:
+  push:
+    branches:
+      include:
+        - main
+        - master
+  pull_request:
+    branches:
+      include:
+        - main
+        - master
+
+stages:
+  # ===========================================================================
+  # 阶段一: 代码质量检查
+  # ===========================================================================
+  - name: 代码检查
+    displayName: "代码语法检查"
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: build@gcc
+        name: 语法检查
+        displayName: "GCC 语法预检"
+        image: "ubuntu:22.04"
+        commands:
+          - apt-get update -qq
+          - apt-get install -y -qq gcc libssh-dev pkg-config > /dev/null 2>&1
+          - echo "========================================="
+          - echo "  HoneyDew 代码语法检查"
+          - echo "========================================="
+          - |
+            FAILED=0
+            for f in main.c src/service/*.c src/utilities/*.c; do
+              if gcc -std=c99 -fsyntax-only \
+                -I./include \
+                $(pkg-config --cflags libssh 2>/dev/null) \
+                "$f" 2>&1; then
+                echo "[通过] $f"
+              else
+                echo "[失败] $f"
+                FAILED=1
+              fi
+            done
+            if [ "$FAILED" -eq 1 ]; then
+              echo "语法检查失败"
+              exit 1
+            fi
+          - echo "所有源文件语法检查通过"
+
+  # ===========================================================================
+  # 阶段二: 编译
+  # ===========================================================================
+  - name: 编译
+    displayName: "CMake 编译"
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: build@gcc
+        name: cmake_build
+        displayName: "CMake Release 编译"
+        image: "ubuntu:22.04"
+        commands:
+          - apt-get update -qq
+          - apt-get install -y -qq
+              build-essential
+              cmake
+              pkg-config
+              libssh-dev
+              openssh-client
+              > /dev/null 2>&1
+          - echo "========================================="
+          - echo "  HoneyDew 编译 (Ubuntu/Linux)"
+          - echo "========================================="
+          - cmake -B build -DCMAKE_BUILD_TYPE=Release
+          - cmake --build build --config Release -j$(nproc)
+          - echo "编译成功"
+          - echo "--- 构建产物 ---"
+          - ls -la build/蜜罐
+          - file build/蜜罐
+        artifacts:
+          - name: "honeydew-linux"
+            path:
+              - build/蜜罐
+              - build/keys/
+
+  # ===========================================================================
+  # 阶段三: 验证
+  # ===========================================================================
+  - name: 验证
+    displayName: "构建产物验证"
+    strategy: naturally
+    trigger: auto
+    steps:
+      - step: run@shell
+        name: 验证产物
+        displayName: "验证编译产物完整性"
+        image: "ubuntu:22.04"
+        commands:
+          - apt-get update -qq
+          - apt-get install -y -qq file libssh-4 > /dev/null 2>&1
+          - echo "========================================="
+          - echo "  HoneyDew 构建产物验证"
+          - echo "========================================="
+          - |
+            if [ ! -f "build/蜜罐" ]; then
+              echo "[失败] 未找到编译产物"
+              exit 1
+            fi
+          - ls -la build/蜜罐
+          - file build/蜜罐
+          - ldd build/蜜罐 || true
+          - |
+            if [ -d "build/keys" ]; then
+              ls -la build/keys/
+              echo "[通过] SSH 密钥已生成"
+            else
+              echo "[警告] SSH 密钥目录不存在"
+            fi
+          - echo "所有验证通过"

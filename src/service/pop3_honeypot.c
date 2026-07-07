@@ -1,6 +1,6 @@
 /**
- * Copyright (c) 2025 zhongjyuan
- * All rights reserved.
+ * 版权所有 (c) 2026 钟智强
+ * 保留所有权利。
  *
  * POP3 蜜罐服务 (Dovecot)
  * 模拟 Dovecot POP3 服务器，捕获用户名和密码。
@@ -15,9 +15,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/socket.h>
 
 #define POP3_RECV_BUFFER_SIZE 4096
 
@@ -61,8 +61,8 @@ void run_pop3_service(connection_t *conn) {
     buf[n] = '\0';
     pop3_strip_crlf(buf);
 
-    UTILITIES_LOG_INFO("[POP3蜜罐] 收到命令: \"%s\" 来自 %s:%d",
-                       buf, conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_INFO("[POP3蜜罐] 收到命令: \"%s\" 来自 %s:%d", buf,
+                       conn->remote_ip, conn->remote_port);
 
     audit_record_command(&g_audit, POP3_PROTOCOL, conn->remote_ip,
                          conn->remote_port, session_id, buf);
@@ -71,8 +71,8 @@ void run_pop3_service(connection_t *conn) {
       strncpy(username, buf + 5, sizeof(username) - 1);
       username[sizeof(username) - 1] = '\0';
 
-      UTILITIES_LOG_INFO("[POP3蜜罐] 用户名: \"%s\" 来自 %s:%d",
-                         username, conn->remote_ip, conn->remote_port);
+      UTILITIES_LOG_INFO("[POP3蜜罐] 用户名: \"%s\" 来自 %s:%d", username,
+                         conn->remote_ip, conn->remote_port);
 
       const char *resp = "+OK\r\n";
       send(conn->socket_file_descriptor, resp, strlen(resp), 0);
@@ -81,8 +81,8 @@ void run_pop3_service(connection_t *conn) {
       const char *password = buf + 5;
 
       UTILITIES_LOG_WARN(
-          "[POP3蜜罐] 捕获凭据: 用户=\"%s\" 密码=\"%s\" 来自 %s:%d",
-          username, password, conn->remote_ip, conn->remote_port);
+          "[POP3蜜罐] 捕获凭据: 用户=\"%s\" 密码=\"%s\" 来自 %s:%d", username,
+          password, conn->remote_ip, conn->remote_port);
 
       audit_record_auth(&g_audit, POP3_PROTOCOL, conn->remote_ip,
                         conn->remote_port, session_id, username, password, 0);
@@ -92,16 +92,15 @@ void run_pop3_service(connection_t *conn) {
       memset(username, 0, sizeof(username));
 
     } else if (strncasecmp(buf, "CAPA", 4) == 0) {
-      const char *resp =
-          "+OK Capability list follows\r\n"
-          "USER\r\n"
-          "UIDL\r\n"
-          "TOP\r\n"
-          "RESP-CODES\r\n"
-          "AUTH-RESP-CODE\r\n"
-          "PIPELINING\r\n"
-          "STLS\r\n"
-          ".\r\n";
+      const char *resp = "+OK Capability list follows\r\n"
+                         "USER\r\n"
+                         "UIDL\r\n"
+                         "TOP\r\n"
+                         "RESP-CODES\r\n"
+                         "AUTH-RESP-CODE\r\n"
+                         "PIPELINING\r\n"
+                         "STLS\r\n"
+                         ".\r\n";
       send(conn->socket_file_descriptor, resp, strlen(resp), 0);
 
     } else if (strncasecmp(buf, "QUIT", 4) == 0) {
@@ -139,8 +138,8 @@ void run_pop3_service(connection_t *conn) {
     }
   }
 
-  UTILITIES_LOG_INFO("[POP3蜜罐] 会话结束: %s:%d",
-                     conn->remote_ip, conn->remote_port);
+  UTILITIES_LOG_INFO("[POP3蜜罐] 会话结束: %s:%d", conn->remote_ip,
+                     conn->remote_port);
 
   audit_record_disconnect(&g_audit, POP3_PROTOCOL, conn->remote_ip,
                           conn->remote_port, session_id);

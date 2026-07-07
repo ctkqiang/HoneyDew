@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025 zhongjyuan
+ * Copyright (c) 2026 钟智强
  * All rights reserved.
  *
  * PostgreSQL 14.10 蜜罐服务
@@ -15,14 +15,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/socket.h>
 
-#define PG_RECV_BUFFER_SIZE    4096
-#define PG_PROTOCOL_VERSION_3  196608
-#define PG_AUTH_MD5            5
-#define PG_SALT_LEN            4
+#define PG_RECV_BUFFER_SIZE 4096
+#define PG_PROTOCOL_VERSION_3 196608
+#define PG_AUTH_MD5 5
+#define PG_SALT_LEN 4
 
 static void pg_generate_session_id(char *buf, size_t len, int fd) {
   struct timespec ts;
@@ -135,8 +135,8 @@ void run_postgresql_service(connection_t *conn) {
   }
 
   if (n < 8) {
-    UTILITIES_LOG_WARN("[PostgreSQL蜜罐] 启动消息过短 (%zd 字节): %s:%d",
-                       n, conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_WARN("[PostgreSQL蜜罐] 启动消息过短 (%zd 字节): %s:%d", n,
+                       conn->remote_ip, conn->remote_port);
     goto pg_cleanup;
   }
 
@@ -145,8 +145,9 @@ void run_postgresql_service(connection_t *conn) {
   uint32_t proto_ver = ((uint32_t)buf[4] << 24) | ((uint32_t)buf[5] << 16) |
                        ((uint32_t)buf[6] << 8) | (uint32_t)buf[7];
 
-  UTILITIES_LOG_DEBUG("[PostgreSQL蜜罐] 启动消息: 长度=%u 协议版本=%u 来自 %s:%d",
-                      msg_len, proto_ver, conn->remote_ip, conn->remote_port);
+  UTILITIES_LOG_DEBUG(
+      "[PostgreSQL蜜罐] 启动消息: 长度=%u 协议版本=%u 来自 %s:%d", msg_len,
+      proto_ver, conn->remote_ip, conn->remote_port);
 
   if (proto_ver == 80877103) {
     UTILITIES_LOG_INFO("[PostgreSQL蜜罐] 收到 SSLRequest，拒绝 SSL: %s:%d",
@@ -166,8 +167,8 @@ void run_postgresql_service(connection_t *conn) {
   }
 
   if (proto_ver != PG_PROTOCOL_VERSION_3) {
-    UTILITIES_LOG_WARN("[PostgreSQL蜜罐] 不支持的协议版本 %u: %s:%d",
-                       proto_ver, conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_WARN("[PostgreSQL蜜罐] 不支持的协议版本 %u: %s:%d", proto_ver,
+                       conn->remote_ip, conn->remote_port);
     pg_send_error_response(conn->socket_file_descriptor, "FATAL", "08004",
                            "unsupported protocol version");
     goto pg_cleanup;
@@ -202,8 +203,8 @@ void run_postgresql_service(connection_t *conn) {
         username, password_hash, conn->remote_ip, conn->remote_port);
 
     audit_record_auth(&g_audit, POSTGRESQL_PROTOCOL, conn->remote_ip,
-                      conn->remote_port, session_id, username,
-                      password_hash, 0);
+                      conn->remote_port, session_id, username, password_hash,
+                      0);
 
     char err_msg[512];
     snprintf(err_msg, sizeof(err_msg),
@@ -216,8 +217,8 @@ void run_postgresql_service(connection_t *conn) {
   }
 
 pg_cleanup:
-  UTILITIES_LOG_INFO("[PostgreSQL蜜罐] 会话结束: %s:%d",
-                     conn->remote_ip, conn->remote_port);
+  UTILITIES_LOG_INFO("[PostgreSQL蜜罐] 会话结束: %s:%d", conn->remote_ip,
+                     conn->remote_port);
 
   audit_record_disconnect(&g_audit, POSTGRESQL_PROTOCOL, conn->remote_ip,
                           conn->remote_port, session_id);

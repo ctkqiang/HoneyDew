@@ -1,6 +1,6 @@
 /**
- * Copyright (c) 2025 zhongjyuan
- * All rights reserved.
+ * 版权所有 (c) 2026 钟智强
+ * 保留所有权利。
  *
  * DNS 蜜罐服务 (TCP)
  * 监听 TCP DNS 查询，解析域名，检测区域传送 (AXFR) 攻击。
@@ -16,19 +16,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/socket.h>
 
 #define DNS_RECV_BUFFER_SIZE 4096
-#define DNS_HEADER_SIZE      12
-#define DNS_QTYPE_A          1
-#define DNS_QTYPE_AXFR       252
-#define DNS_RCODE_SERVFAIL   2
-#define DNS_FAKE_IP_A        10
-#define DNS_FAKE_IP_B        0
-#define DNS_FAKE_IP_C        2
-#define DNS_FAKE_IP_D        15
+#define DNS_HEADER_SIZE 12
+#define DNS_QTYPE_A 1
+#define DNS_QTYPE_AXFR 252
+#define DNS_RCODE_SERVFAIL 2
+#define DNS_FAKE_IP_A 10
+#define DNS_FAKE_IP_B 0
+#define DNS_FAKE_IP_C 2
+#define DNS_FAKE_IP_D 15
 
 static void dns_generate_session_id(char *buf, size_t len, int fd) {
   struct timespec ts;
@@ -103,9 +103,9 @@ static size_t dns_build_servfail(const unsigned char *query, size_t qlen,
   return qlen;
 }
 
-static size_t dns_build_fake_a_response(const unsigned char *query,
-                                        size_t qlen, size_t qname_end,
-                                        unsigned char *resp, size_t rsize) {
+static size_t dns_build_fake_a_response(const unsigned char *query, size_t qlen,
+                                        size_t qname_end, unsigned char *resp,
+                                        size_t rsize) {
   size_t question_end = qname_end + 4;
   size_t answer_size = 2 + 2 + 2 + 4 + 2 + 4;
   size_t total = question_end + answer_size;
@@ -156,9 +156,8 @@ void run_dns_service(connection_t *conn) {
   dns_generate_session_id(session_id, sizeof(session_id),
                           conn->socket_file_descriptor);
 
-  UTILITIES_LOG_INFO("[DNS蜜罐] 新连接建立: %s:%d (套接字=%d)",
-                     conn->remote_ip, conn->remote_port,
-                     conn->socket_file_descriptor);
+  UTILITIES_LOG_INFO("[DNS蜜罐] 新连接建立: %s:%d (套接字=%d)", conn->remote_ip,
+                     conn->remote_port, conn->socket_file_descriptor);
 
   audit_record_connection(&g_audit, DNS_PROTOCOL, conn->remote_ip,
                           conn->remote_port, session_id);
@@ -167,8 +166,8 @@ void run_dns_service(connection_t *conn) {
   ssize_t n = recv(conn->socket_file_descriptor, raw, sizeof(raw), 0);
 
   if (n <= 0) {
-    UTILITIES_LOG_WARN("[DNS蜜罐] 未收到数据: %s:%d",
-                       conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_WARN("[DNS蜜罐] 未收到数据: %s:%d", conn->remote_ip,
+                       conn->remote_port);
     goto dns_cleanup;
   }
 
@@ -187,29 +186,29 @@ void run_dns_service(connection_t *conn) {
   }
 
   if (dns_len < DNS_HEADER_SIZE) {
-    UTILITIES_LOG_WARN("[DNS蜜罐] DNS 消息过短 (%zu 字节): %s:%d",
-                       dns_len, conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_WARN("[DNS蜜罐] DNS 消息过短 (%zu 字节): %s:%d", dns_len,
+                       conn->remote_ip, conn->remote_port);
     goto dns_cleanup;
   }
 
   uint16_t qdcount = ((uint16_t)dns_msg[4] << 8) | (uint16_t)dns_msg[5];
 
   UTILITIES_LOG_DEBUG("[DNS蜜罐] DNS 头部: ID=0x%02x%02x QD=%u 来自 %s:%d",
-                      dns_msg[0], dns_msg[1], qdcount,
-                      conn->remote_ip, conn->remote_port);
+                      dns_msg[0], dns_msg[1], qdcount, conn->remote_ip,
+                      conn->remote_port);
 
   char domain[512] = {0};
   size_t qname_offset = DNS_HEADER_SIZE;
-  int parsed = dns_parse_domain_name(dns_msg, dns_len, qname_offset,
-                                     domain, sizeof(domain));
+  int parsed = dns_parse_domain_name(dns_msg, dns_len, qname_offset, domain,
+                                     sizeof(domain));
 
   if (parsed <= 0) {
-    UTILITIES_LOG_WARN("[DNS蜜罐] 域名解析失败: %s:%d",
-                       conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_WARN("[DNS蜜罐] 域名解析失败: %s:%d", conn->remote_ip,
+                       conn->remote_port);
 
     unsigned char servfail[DNS_RECV_BUFFER_SIZE];
-    size_t rlen = dns_build_servfail(dns_msg, dns_len, servfail,
-                                     sizeof(servfail));
+    size_t rlen =
+        dns_build_servfail(dns_msg, dns_len, servfail, sizeof(servfail));
     if (rlen > 0) {
       if (tcp_framed) {
         uint16_t tcp_rlen = htons((uint16_t)rlen);
@@ -228,17 +227,17 @@ void run_dns_service(connection_t *conn) {
 
   if (qtype == DNS_QTYPE_AXFR) {
     UTILITIES_LOG_ERROR(
-        "[DNS蜜罐] 检测到区域传送 (AXFR) 攻击: 域名=\"%s\" 来自 %s:%d",
-        domain, conn->remote_ip, conn->remote_port);
+        "[DNS蜜罐] 检测到区域传送 (AXFR) 攻击: 域名=\"%s\" 来自 %s:%d", domain,
+        conn->remote_ip, conn->remote_port);
 
     audit_record_event(&g_audit, AUDIT_EVENT_EXPLOIT_ATTEMPT,
-                       AUDIT_SEVERITY_CRITICAL, DNS_PROTOCOL,
-                       conn->remote_ip, conn->remote_port, session_id,
-                       "", "AXFR zone transfer attempt: %s", domain);
+                       AUDIT_SEVERITY_CRITICAL, DNS_PROTOCOL, conn->remote_ip,
+                       conn->remote_port, session_id, "",
+                       "AXFR zone transfer attempt: %s", domain);
 
     unsigned char servfail[DNS_RECV_BUFFER_SIZE];
-    size_t rlen = dns_build_servfail(dns_msg, dns_len, servfail,
-                                     sizeof(servfail));
+    size_t rlen =
+        dns_build_servfail(dns_msg, dns_len, servfail, sizeof(servfail));
     if (rlen > 0) {
       servfail[3] = (servfail[3] & 0xF0) | 0x05;
 
@@ -256,8 +255,8 @@ void run_dns_service(connection_t *conn) {
     size_t rlen;
 
     if (qtype == DNS_QTYPE_A) {
-      rlen = dns_build_fake_a_response(dns_msg, dns_len, qname_end,
-                                       resp_buf, sizeof(resp_buf));
+      rlen = dns_build_fake_a_response(dns_msg, dns_len, qname_end, resp_buf,
+                                       sizeof(resp_buf));
       UTILITIES_LOG_INFO("[DNS蜜罐] 返回伪造 A 记录 10.0.2.15: \"%s\" -> %s:%d",
                          domain, conn->remote_ip, conn->remote_port);
     } else {
@@ -276,8 +275,8 @@ void run_dns_service(connection_t *conn) {
   }
 
 dns_cleanup:
-  UTILITIES_LOG_INFO("[DNS蜜罐] 会话结束: %s:%d",
-                     conn->remote_ip, conn->remote_port);
+  UTILITIES_LOG_INFO("[DNS蜜罐] 会话结束: %s:%d", conn->remote_ip,
+                     conn->remote_port);
 
   audit_record_disconnect(&g_audit, DNS_PROTOCOL, conn->remote_ip,
                           conn->remote_port, session_id);

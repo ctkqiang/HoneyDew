@@ -1,8 +1,8 @@
 /**
  * telnet_honeypot.c
  *
- * Telnet honeypot service simulating a Linux BusyBox telnet login.
- * Captures attacker credentials and shell commands for audit logging.
+ * Telnet 蜜罐服务，模拟 Linux BusyBox telnet 登录。
+ * 捕获攻击者凭据和 shell 命令，用于审计日志记录。
  */
 
 #include "../../include/audit.h"
@@ -25,24 +25,23 @@
 #define TELNET_MAX_AUTH_ATTEMPTS 2
 #define TELNET_SHELL_PROMPT "root@honeydew:~# "
 
-#define TELNET_BANNER                                                          \
-  "\r\nUbuntu 22.04.3 LTS\r\nhoneydew login: "
+#define TELNET_BANNER "\r\nUbuntu 22.04.3 LTS\r\nhoneydew login: "
 
 #define TELNET_MOTD                                                            \
   "\r\n"                                                                       \
-  "Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-91-generic x86_64)\r\n"    \
+  "Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-91-generic x86_64)\r\n"     \
   "\r\n"                                                                       \
   "\r\n"                                                                       \
-  "BusyBox v1.35.0 (Ubuntu 1:1.35.0-4ubuntu1) built-in shell (ash)\r\n"       \
+  "BusyBox v1.35.0 (Ubuntu 1:1.35.0-4ubuntu1) built-in shell (ash)\r\n"        \
   "Enter 'help' for a list of built-in commands.\r\n"                          \
   "\r\n"
 
-/* Telnet IAC sequences for echo control */
+/* Telnet IAC 序列，用于回显控制 */
 static const unsigned char iac_will_echo[] = {0xFF, 0xFB, 0x01};
 static const unsigned char iac_wont_echo[] = {0xFF, 0xFC, 0x01};
 
 /* ========================================================================== */
-/* Internal helpers                                                           */
+/* 内部辅助函数                                                               */
 /* ========================================================================== */
 
 static void telnet_generate_session_id(char *buf, size_t len, int fd) {
@@ -58,10 +57,10 @@ static void telnet_strip_crlf(char *str) {
 }
 
 /**
- * Strip telnet IAC negotiation bytes from raw input.
- * IAC commands are 3-byte sequences starting with 0xFF.
- * Sub-negotiation (0xFF 0xFA ... 0xFF 0xF0) is also stripped.
- * Returns the number of clean bytes written to dst.
+ * 从原始输入中剥离 Telnet IAC 协商字节。
+ * IAC 命令是以 0xFF 开头的 3 字节序列。
+ * 子协商（0xFF 0xFA ... 0xFF 0xF0）也会被剥离。
+ * 返回写入 dst 的干净字节数。
  */
 static size_t telnet_strip_iac(const unsigned char *src, size_t src_len,
                                char *dst, size_t dst_cap) {
@@ -73,7 +72,7 @@ static size_t telnet_strip_iac(const unsigned char *src, size_t src_len,
       unsigned char cmd = src[si + 1];
 
       if (cmd == 0xFA) {
-        /* Sub-negotiation: skip until IAC SE (0xFF 0xF0) */
+        /* 子协商：跳过直到 IAC SE（0xFF 0xF0） */
         si += 2;
         while (si < src_len) {
           if (src[si] == 0xFF && si + 1 < src_len && src[si + 1] == 0xF0) {
@@ -86,19 +85,19 @@ static size_t telnet_strip_iac(const unsigned char *src, size_t src_len,
       }
 
       if (cmd >= 0xFB && cmd <= 0xFE) {
-        /* WILL / WONT / DO / DONT: 3-byte command */
+        /* WILL / WONT / DO / DONT：3 字节命令 */
         si += 3;
         continue;
       }
 
       if (cmd == 0xFF) {
-        /* Escaped 0xFF literal */
+        /* 转义的 0xFF 字面量 */
         dst[di++] = (char)0xFF;
         si += 2;
         continue;
       }
 
-      /* Other 2-byte IAC commands (e.g., IAC NOP, IAC GA) */
+      /* 其他 2 字节 IAC 命令（例如 IAC NOP、IAC GA） */
       si += 2;
       continue;
     }
@@ -119,8 +118,8 @@ static ssize_t telnet_send_str(int fd, const char *str) {
 }
 
 /**
- * Read a line from the telnet client, stripping IAC bytes.
- * Returns the length of the clean line, or -1 on disconnect/error.
+ * 从 Telnet 客户端读取一行，剥离 IAC 字节。
+ * 返回干净行的长度，断开连接或出错时返回 -1。
  */
 static ssize_t telnet_read_line(int fd, char *out, size_t out_cap) {
   unsigned char raw[TELNET_RECV_BUFFER_SIZE];
@@ -136,7 +135,7 @@ static ssize_t telnet_read_line(int fd, char *out, size_t out_cap) {
 }
 
 /* ========================================================================== */
-/* Fake command responses                                                     */
+/* 伪造命令响应                                                               */
 /* ========================================================================== */
 
 static const char *telnet_fake_response(const char *cmd, const char *remote_ip,
@@ -181,8 +180,10 @@ static const char *telnet_fake_response(const char *cmd, const char *remote_ip,
 
   if (strstr(cmd, "ifconfig") || strstr(cmd, "ip addr"))
     return "eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500\r\n"
-           "        inet 10.0.2.15  netmask 255.255.255.0  broadcast 10.0.2.255\r\n"
-           "        inet6 fe80::a00:27ff:fe8d:c04d  prefixlen 64  scopeid 0x20<link>\r\n"
+           "        inet 10.0.2.15  netmask 255.255.255.0  broadcast "
+           "10.0.2.255\r\n"
+           "        inet6 fe80::a00:27ff:fe8d:c04d  prefixlen 64  scopeid "
+           "0x20<link>\r\n"
            "        ether 08:00:27:8d:c0:4d  txqueuelen 1000  (Ethernet)\r\n"
            "\r\n"
            "lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536\r\n"
@@ -190,12 +191,11 @@ static const char *telnet_fake_response(const char *cmd, const char *remote_ip,
            "        inet6 ::1  prefixlen 128  scopeid 0x10<host>\r\n";
 
   if (strstr(cmd, "wget") || strstr(cmd, "curl")) {
-    /* Extract URL for logging */
+    /* 提取 URL 用于日志记录 */
     const char *url_start = strstr(cmd, "http");
     if (url_start) {
-      UTILITIES_LOG_WARN(
-          "[Telnet蜜罐] 检测到下载尝试: URL=\"%s\" 来自 %s:%d",
-          url_start, remote_ip, remote_port);
+      UTILITIES_LOG_WARN("[Telnet蜜罐] 检测到下载尝试: URL=\"%s\" 来自 %s:%d",
+                         url_start, remote_ip, remote_port);
     }
     if (strstr(cmd, "wget"))
       return "Connecting to remote host... Connection refused\r\n";
@@ -214,7 +214,8 @@ static const char *telnet_fake_response(const char *cmd, const char *remote_ip,
     return "honeydew\r\n";
 
   if (strstr(cmd, "uptime"))
-    return " 14:23:01 up 42 days,  3:17,  1 user,  load average: 0.08, 0.03, 0.01\r\n";
+    return " 14:23:01 up 42 days,  3:17,  1 user,  load average: 0.08, 0.03, "
+           "0.01\r\n";
 
   if (strstr(cmd, "exit") || strstr(cmd, "logout"))
     return NULL;
@@ -223,7 +224,7 @@ static const char *telnet_fake_response(const char *cmd, const char *remote_ip,
 }
 
 /* ========================================================================== */
-/* Telnet honeypot entry point                                                */
+/* Telnet 蜜罐入口点                                                          */
 /* ========================================================================== */
 
 void run_telnet_service(connection_t *conn) {
@@ -243,9 +244,9 @@ void run_telnet_service(connection_t *conn) {
   int auth_attempts = 0;
   int authenticated = 0;
 
-  /* ---- Authentication phase ---- */
+  /* ---- 认证阶段 ---- */
   while (!authenticated && auth_attempts < TELNET_MAX_AUTH_ATTEMPTS) {
-    /* Send login banner / prompt */
+    /* 发送登录横幅/提示符 */
     if (auth_attempts == 0) {
       telnet_send_str(fd, TELNET_BANNER);
     } else {
@@ -253,7 +254,7 @@ void run_telnet_service(connection_t *conn) {
       telnet_send_str(fd, "honeydew login: ");
     }
 
-    /* Read username */
+    /* 读取用户名 */
     ssize_t ulen = telnet_read_line(fd, line_buf, sizeof(line_buf));
     if (ulen < 0)
       goto session_end;
@@ -262,14 +263,14 @@ void run_telnet_service(connection_t *conn) {
     strncpy(username, line_buf, sizeof(username) - 1);
     username[sizeof(username) - 1] = '\0';
 
-    /* Send IAC WILL ECHO to suppress client-side echo for password */
+    /* 发送 IAC WILL ECHO 以抑制客户端密码回显 */
     telnet_send(fd, iac_will_echo, sizeof(iac_will_echo));
     telnet_send_str(fd, "Password: ");
 
-    /* Read password */
+    /* 读取密码 */
     ssize_t plen = telnet_read_line(fd, line_buf, sizeof(line_buf));
 
-    /* Send IAC WONT ECHO to re-enable client echo */
+    /* 发送 IAC WONT ECHO 以重新启用客户端回显 */
     telnet_send(fd, iac_wont_echo, sizeof(iac_wont_echo));
     telnet_send_str(fd, "\r\n");
 
@@ -281,8 +282,8 @@ void run_telnet_service(connection_t *conn) {
     password[sizeof(password) - 1] = '\0';
 
     UTILITIES_LOG_WARN(
-        "[Telnet蜜罐] 捕获凭据: 用户=\"%s\" 密码=\"%s\" 来自 %s:%d",
-        username, password, conn->remote_ip, conn->remote_port);
+        "[Telnet蜜罐] 捕获凭据: 用户=\"%s\" 密码=\"%s\" 来自 %s:%d", username,
+        password, conn->remote_ip, conn->remote_port);
 
     audit_record_auth(&g_audit, TELNET_PROTOCOL, conn->remote_ip,
                       conn->remote_port, session_id, username, password, 0);
@@ -295,15 +296,15 @@ void run_telnet_service(connection_t *conn) {
   }
 
   if (!authenticated) {
-    UTILITIES_LOG_INFO("[Telnet蜜罐] 认证阶段断开: %s:%d",
-                       conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_INFO("[Telnet蜜罐] 认证阶段断开: %s:%d", conn->remote_ip,
+                       conn->remote_port);
     goto session_end;
   }
 
-  UTILITIES_LOG_WARN("[Telnet蜜罐] 攻击者已\"登录\": %s:%d",
-                     conn->remote_ip, conn->remote_port);
+  UTILITIES_LOG_WARN("[Telnet蜜罐] 攻击者已\"登录\": %s:%d", conn->remote_ip,
+                     conn->remote_port);
 
-  /* ---- Post-login MOTD and shell loop ---- */
+  /* ---- 登录后 MOTD 和 shell 循环 ---- */
   telnet_send_str(fd, TELNET_MOTD);
 
   while (1) {
@@ -316,14 +317,14 @@ void run_telnet_service(connection_t *conn) {
     if (strlen(line_buf) == 0)
       continue;
 
-    UTILITIES_LOG_WARN("[Telnet蜜罐] 执行命令: \"%s\" 来自 %s:%d",
-                       line_buf, conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_WARN("[Telnet蜜罐] 执行命令: \"%s\" 来自 %s:%d", line_buf,
+                       conn->remote_ip, conn->remote_port);
 
     audit_record_command(&g_audit, TELNET_PROTOCOL, conn->remote_ip,
                          conn->remote_port, session_id, line_buf);
 
-    const char *response = telnet_fake_response(line_buf, conn->remote_ip,
-                                                conn->remote_port);
+    const char *response =
+        telnet_fake_response(line_buf, conn->remote_ip, conn->remote_port);
     if (!response) {
       UTILITIES_LOG_INFO("[Telnet蜜罐] 攻击者退出 shell: %s:%d",
                          conn->remote_ip, conn->remote_port);
@@ -336,8 +337,8 @@ void run_telnet_service(connection_t *conn) {
   }
 
 session_end:
-  UTILITIES_LOG_INFO("[Telnet蜜罐] 会话已关闭: %s:%d",
-                     conn->remote_ip, conn->remote_port);
+  UTILITIES_LOG_INFO("[Telnet蜜罐] 会话已关闭: %s:%d", conn->remote_ip,
+                     conn->remote_port);
 
   audit_record_disconnect(&g_audit, TELNET_PROTOCOL, conn->remote_ip,
                           conn->remote_port, session_id);

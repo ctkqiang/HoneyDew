@@ -1,6 +1,6 @@
 /**
- * Copyright (c) 2025 zhongjyuan
- * All rights reserved.
+ * 版权所有 (c) 2026 钟智强
+ * 保留所有权利。
  *
  * QuestDB 7.3.10 蜜罐服务
  * QuestDB 使用 PostgreSQL 线协议 (端口 8812)。
@@ -16,15 +16,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/socket.h>
 
-#define QDB_RECV_BUFFER_SIZE    4096
-#define QDB_PROTOCOL_VERSION_3  196608
-#define QDB_AUTH_MD5            5
-#define QDB_SALT_LEN            4
-#define QDB_SERVER_VERSION      "QuestDB 7.3.10"
+#define QDB_RECV_BUFFER_SIZE 4096
+#define QDB_PROTOCOL_VERSION_3 196608
+#define QDB_AUTH_MD5 5
+#define QDB_SALT_LEN 4
+#define QDB_SERVER_VERSION "QuestDB 7.3.10"
 
 static void qdb_generate_session_id(char *buf, size_t len, int fd) {
   struct timespec ts;
@@ -194,14 +194,14 @@ void run_questdb_service(connection_t *conn) {
   ssize_t n = recv(conn->socket_file_descriptor, buf, sizeof(buf), 0);
 
   if (n <= 0) {
-    UTILITIES_LOG_WARN("[QuestDB蜜罐] 未收到启动消息: %s:%d",
-                       conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_WARN("[QuestDB蜜罐] 未收到启动消息: %s:%d", conn->remote_ip,
+                       conn->remote_port);
     goto qdb_cleanup;
   }
 
   if (n < 8) {
-    UTILITIES_LOG_WARN("[QuestDB蜜罐] 启动消息过短 (%zd 字节): %s:%d",
-                       n, conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_WARN("[QuestDB蜜罐] 启动消息过短 (%zd 字节): %s:%d", n,
+                       conn->remote_ip, conn->remote_port);
     goto qdb_cleanup;
   }
 
@@ -226,8 +226,8 @@ void run_questdb_service(connection_t *conn) {
   }
 
   if (proto_ver != QDB_PROTOCOL_VERSION_3) {
-    UTILITIES_LOG_WARN("[QuestDB蜜罐] 不支持的协议版本 %u: %s:%d",
-                       proto_ver, conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_WARN("[QuestDB蜜罐] 不支持的协议版本 %u: %s:%d", proto_ver,
+                       conn->remote_ip, conn->remote_port);
     qdb_send_error_response(conn->socket_file_descriptor, "FATAL", "08004",
                             "unsupported protocol version");
     goto qdb_cleanup;
@@ -236,8 +236,8 @@ void run_questdb_service(connection_t *conn) {
   char username[256] = {0};
   qdb_parse_startup_username(buf, n, username, sizeof(username));
 
-  UTILITIES_LOG_INFO("[QuestDB蜜罐] 启动参数: 用户=\"%s\" 来自 %s:%d",
-                     username, conn->remote_ip, conn->remote_port);
+  UTILITIES_LOG_INFO("[QuestDB蜜罐] 启动参数: 用户=\"%s\" 来自 %s:%d", username,
+                     conn->remote_ip, conn->remote_port);
 
   unsigned char salt[QDB_SALT_LEN];
   srand((unsigned int)time(NULL) ^ (unsigned int)conn->socket_file_descriptor);
@@ -250,8 +250,8 @@ void run_questdb_service(connection_t *conn) {
   n = recv(conn->socket_file_descriptor, buf, sizeof(buf), 0);
 
   if (n <= 5 || buf[0] != 'p') {
-    UTILITIES_LOG_WARN("[QuestDB蜜罐] 未收到密码响应: %s:%d",
-                       conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_WARN("[QuestDB蜜罐] 未收到密码响应: %s:%d", conn->remote_ip,
+                       conn->remote_port);
     goto qdb_cleanup;
   }
 
@@ -267,19 +267,18 @@ void run_questdb_service(connection_t *conn) {
       username, password_hash, conn->remote_ip, conn->remote_port);
 
   audit_record_auth(&g_audit, QUESTDB_PROTOCOL, conn->remote_ip,
-                    conn->remote_port, session_id, username,
-                    password_hash, 0);
+                    conn->remote_port, session_id, username, password_hash, 0);
 
   qdb_send_auth_ok(conn->socket_file_descriptor);
 
-  qdb_send_parameter_status(conn->socket_file_descriptor,
-                            "server_version", QDB_SERVER_VERSION);
-  qdb_send_parameter_status(conn->socket_file_descriptor,
-                            "server_encoding", "UTF8");
-  qdb_send_parameter_status(conn->socket_file_descriptor,
-                            "client_encoding", "UTF8");
-  qdb_send_parameter_status(conn->socket_file_descriptor,
-                            "DateStyle", "ISO, MDY");
+  qdb_send_parameter_status(conn->socket_file_descriptor, "server_version",
+                            QDB_SERVER_VERSION);
+  qdb_send_parameter_status(conn->socket_file_descriptor, "server_encoding",
+                            "UTF8");
+  qdb_send_parameter_status(conn->socket_file_descriptor, "client_encoding",
+                            "UTF8");
+  qdb_send_parameter_status(conn->socket_file_descriptor, "DateStyle",
+                            "ISO, MDY");
 
   qdb_send_ready_for_query(conn->socket_file_descriptor);
 
@@ -302,8 +301,8 @@ void run_questdb_service(connection_t *conn) {
         qdb_strip_crlf(sql);
       }
 
-      UTILITIES_LOG_WARN("[QuestDB蜜罐] SQL 查询: \"%s\" 来自 %s:%d",
-                         sql, conn->remote_ip, conn->remote_port);
+      UTILITIES_LOG_WARN("[QuestDB蜜罐] SQL 查询: \"%s\" 来自 %s:%d", sql,
+                         conn->remote_ip, conn->remote_port);
 
       audit_record_command(&g_audit, QUESTDB_PROTOCOL, conn->remote_ip,
                            conn->remote_port, session_id, sql);
@@ -311,24 +310,22 @@ void run_questdb_service(connection_t *conn) {
       if (strncasecmp(sql, "SELECT", 6) == 0) {
         qdb_send_empty_query_result(conn->socket_file_descriptor, "SELECT 0");
       } else if (strncasecmp(sql, "INSERT", 6) == 0) {
-        qdb_send_empty_query_result(conn->socket_file_descriptor,
-                                    "INSERT 0 1");
+        qdb_send_empty_query_result(conn->socket_file_descriptor, "INSERT 0 1");
       } else if (strncasecmp(sql, "CREATE", 6) == 0) {
         qdb_send_empty_query_result(conn->socket_file_descriptor,
                                     "CREATE TABLE");
       } else if (strncasecmp(sql, "SHOW", 4) == 0) {
         qdb_send_empty_query_result(conn->socket_file_descriptor, "SHOW");
       } else if (strncasecmp(sql, "DROP", 4) == 0) {
-        UTILITIES_LOG_WARN(
-            "[QuestDB蜜罐] 检测到 DROP 操作: \"%s\" 来自 %s:%d",
-            sql, conn->remote_ip, conn->remote_port);
-        qdb_send_error_response(conn->socket_file_descriptor, "ERROR",
-                                "42501", "permission denied");
+        UTILITIES_LOG_WARN("[QuestDB蜜罐] 检测到 DROP 操作: \"%s\" 来自 %s:%d",
+                           sql, conn->remote_ip, conn->remote_port);
+        qdb_send_error_response(conn->socket_file_descriptor, "ERROR", "42501",
+                                "permission denied");
         qdb_send_ready_for_query(conn->socket_file_descriptor);
         continue;
       } else {
-        qdb_send_error_response(conn->socket_file_descriptor, "ERROR",
-                                "42601", "syntax error");
+        qdb_send_error_response(conn->socket_file_descriptor, "ERROR", "42601",
+                                "syntax error");
         qdb_send_ready_for_query(conn->socket_file_descriptor);
         continue;
       }
@@ -336,8 +333,8 @@ void run_questdb_service(connection_t *conn) {
       qdb_send_ready_for_query(conn->socket_file_descriptor);
 
     } else if (msg_type == 'X') {
-      UTILITIES_LOG_INFO("[QuestDB蜜罐] 收到终止消息: %s:%d",
-                         conn->remote_ip, conn->remote_port);
+      UTILITIES_LOG_INFO("[QuestDB蜜罐] 收到终止消息: %s:%d", conn->remote_ip,
+                         conn->remote_port);
       break;
 
     } else if (msg_type == 'P') {
@@ -352,14 +349,14 @@ void run_questdb_service(connection_t *conn) {
 
     } else {
       UTILITIES_LOG_DEBUG("[QuestDB蜜罐] 未知消息类型 '%c' (0x%02x): %s:%d",
-                          msg_type, (unsigned char)msg_type,
-                          conn->remote_ip, conn->remote_port);
+                          msg_type, (unsigned char)msg_type, conn->remote_ip,
+                          conn->remote_port);
     }
   }
 
 qdb_cleanup:
-  UTILITIES_LOG_INFO("[QuestDB蜜罐] 会话结束: %s:%d",
-                     conn->remote_ip, conn->remote_port);
+  UTILITIES_LOG_INFO("[QuestDB蜜罐] 会话结束: %s:%d", conn->remote_ip,
+                     conn->remote_port);
 
   audit_record_disconnect(&g_audit, QUESTDB_PROTOCOL, conn->remote_ip,
                           conn->remote_port, session_id);

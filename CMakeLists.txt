@@ -143,15 +143,24 @@ set(KEY_DIR  "${CMAKE_BINARY_DIR}/keys")
 set(KEY_PRIV "${KEY_DIR}/ssh_host_rsa_key")
 set(KEY_PUB  "${KEY_PRIV}.pub")
 
-add_custom_command(
-  OUTPUT  ${KEY_PRIV} ${KEY_PUB}
-  COMMAND ${CMAKE_COMMAND} -E make_directory ${KEY_DIR}
-  COMMAND chmod 700 ${KEY_DIR}
-  COMMAND ssh-keygen -t rsa -b 2048 -f ${KEY_PRIV} -N "" -q -C "honeydew@蜜罐"
-  COMMAND chmod 600 ${KEY_PRIV}
-  COMMAND chmod 644 ${KEY_PUB}
-  COMMENT "[密钥生成] 正在生成 RSA-2048 SSH 主机密钥..."
-)
+if(WIN32)
+  add_custom_command(
+    OUTPUT  ${KEY_PRIV} ${KEY_PUB}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${KEY_DIR}
+    COMMAND ssh-keygen -t rsa -b 2048 -f ${KEY_PRIV} -N "" -q -C "honeydew"
+    COMMENT "[密钥生成] 正在生成 RSA-2048 SSH 主机密钥 (Windows)..."
+  )
+else()
+  add_custom_command(
+    OUTPUT  ${KEY_PRIV} ${KEY_PUB}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${KEY_DIR}
+    COMMAND chmod 700 ${KEY_DIR}
+    COMMAND ssh-keygen -t rsa -b 2048 -f ${KEY_PRIV} -N "" -q -C "honeydew@蜜罐"
+    COMMAND chmod 600 ${KEY_PRIV}
+    COMMAND chmod 644 ${KEY_PUB}
+    COMMENT "[密钥生成] 正在生成 RSA-2048 SSH 主机密钥..."
+  )
+endif()
 
 add_custom_target(ssh_keys DEPENDS ${KEY_PRIV})
 add_dependencies(蜜罐 ssh_keys)

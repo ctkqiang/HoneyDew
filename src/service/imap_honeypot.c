@@ -1,6 +1,6 @@
 /**
- * Copyright (c) 2025 zhongjyuan
- * All rights reserved.
+ * 版权所有 (c) 2026 钟智强
+ * 保留所有权利。
  *
  * IMAP 蜜罐服务 (Dovecot)
  * 模拟 Dovecot IMAP4rev1 服务器，捕获 LOGIN 凭据。
@@ -15,9 +15,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/socket.h>
 
 #define IMAP_RECV_BUFFER_SIZE 4096
 
@@ -109,8 +109,8 @@ void run_imap_service(connection_t *conn) {
     buf[n] = '\0';
     imap_strip_crlf(buf);
 
-    UTILITIES_LOG_INFO("[IMAP蜜罐] 收到命令: \"%s\" 来自 %s:%d",
-                       buf, conn->remote_ip, conn->remote_port);
+    UTILITIES_LOG_INFO("[IMAP蜜罐] 收到命令: \"%s\" 来自 %s:%d", buf,
+                       conn->remote_ip, conn->remote_port);
 
     audit_record_command(&g_audit, IMAP_PROTOCOL, conn->remote_ip,
                          conn->remote_port, session_id, buf);
@@ -133,12 +133,12 @@ void run_imap_service(connection_t *conn) {
       char username[256] = {0};
       char password[256] = {0};
 
-      imap_parse_login_args(cmd + 6, username, sizeof(username),
-                            password, sizeof(password));
+      imap_parse_login_args(cmd + 6, username, sizeof(username), password,
+                            sizeof(password));
 
       UTILITIES_LOG_WARN(
-          "[IMAP蜜罐] 捕获凭据: 用户=\"%s\" 密码=\"%s\" 来自 %s:%d",
-          username, password, conn->remote_ip, conn->remote_port);
+          "[IMAP蜜罐] 捕获凭据: 用户=\"%s\" 密码=\"%s\" 来自 %s:%d", username,
+          password, conn->remote_ip, conn->remote_port);
 
       audit_record_auth(&g_audit, IMAP_PROTOCOL, conn->remote_ip,
                         conn->remote_port, session_id, username, password, 0);
@@ -173,13 +173,12 @@ void run_imap_service(connection_t *conn) {
 
     } else if (strncasecmp(cmd, "STARTTLS", 8) == 0) {
       char resp[256];
-      snprintf(resp, sizeof(resp),
-               "%s BAD TLS not available\r\n", tag);
+      snprintf(resp, sizeof(resp), "%s BAD TLS not available\r\n", tag);
       send(conn->socket_file_descriptor, resp, strlen(resp), 0);
 
     } else if (strncasecmp(cmd, "AUTHENTICATE", 12) == 0) {
-      UTILITIES_LOG_WARN("[IMAP蜜罐] AUTHENTICATE 尝试: \"%s\" 来自 %s:%d",
-                         cmd, conn->remote_ip, conn->remote_port);
+      UTILITIES_LOG_WARN("[IMAP蜜罐] AUTHENTICATE 尝试: \"%s\" 来自 %s:%d", cmd,
+                         conn->remote_ip, conn->remote_port);
       char resp[256];
       snprintf(resp, sizeof(resp),
                "%s NO [AUTHENTICATIONFAILED] Authentication failed.\r\n", tag);
@@ -192,20 +191,18 @@ void run_imap_service(connection_t *conn) {
                strncasecmp(cmd, "STORE", 5) == 0 ||
                strncasecmp(cmd, "SEARCH", 6) == 0) {
       char resp[256];
-      snprintf(resp, sizeof(resp),
-               "%s BAD Not authenticated\r\n", tag);
+      snprintf(resp, sizeof(resp), "%s BAD Not authenticated\r\n", tag);
       send(conn->socket_file_descriptor, resp, strlen(resp), 0);
 
     } else {
       char resp[256];
-      snprintf(resp, sizeof(resp),
-               "%s BAD Command not recognized\r\n", tag);
+      snprintf(resp, sizeof(resp), "%s BAD Command not recognized\r\n", tag);
       send(conn->socket_file_descriptor, resp, strlen(resp), 0);
     }
   }
 
-  UTILITIES_LOG_INFO("[IMAP蜜罐] 会话结束: %s:%d",
-                     conn->remote_ip, conn->remote_port);
+  UTILITIES_LOG_INFO("[IMAP蜜罐] 会话结束: %s:%d", conn->remote_ip,
+                     conn->remote_port);
 
   audit_record_disconnect(&g_audit, IMAP_PROTOCOL, conn->remote_ip,
                           conn->remote_port, session_id);
